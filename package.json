@@ -1,16 +1,26 @@
 {
   "name": "twikoo-cloudflare",
-  "version": "0.0.0",
-  "private": true,
+  "version": "1.6.32",
+  "description": "A simple comment system.",
+  "author": "Tao Xin <tao@vanjs.org> (https://github.com/Tao-VanJS)",
+  "license": "MIT",
+  "type": "module",
   "scripts": {
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
     "start": "wrangler dev",
     "test": "vitest"
   },
+  "homepage": "https://twikoo.js.org",
   "devDependencies": {
-    "wrangler": "^3.0.0",
+    "@cloudflare/vitest-pool-workers": "^0.1.0",
     "vitest": "1.3.0",
-    "@cloudflare/vitest-pool-workers": "^0.1.0"
+    "wrangler": "^3.0.0"
+  },
+  "dependencies": {
+    "get-user-ip": "^1.0.2",
+    "twikoo-func": "^1.6.32",
+    "url": "^0.11.3",
+    "uuid": "^9.0.1"
   }
 }
