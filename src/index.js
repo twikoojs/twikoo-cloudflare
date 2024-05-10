@@ -6,35 +6,35 @@
 
 import { v4 as uuidv4 } from 'uuid' // 用户 id 生成
 import {
-  $,
-  md5,
-  xml2js
+	$,
+	md5,
+	xml2js
 } from 'twikoo-func/utils/lib'
 import {
-  getFuncVersion,
-  parseComment,
-  parseCommentForAdmin,
-  normalizeMail,
-  equalsMail,
-  getMailMd5,
-  getAvatar,
-  isQQ,
-  addQQMailSuffix,
-  getQQAvatar,
-  getPasswordStatus,
-  preCheckSpam,
-  checkTurnstileCaptcha,
-  getConfig,
-  getConfigForAdmin,
-  validate
+	getFuncVersion,
+	parseComment,
+	parseCommentForAdmin,
+	normalizeMail,
+	equalsMail,
+	getMailMd5,
+	getAvatar,
+	isQQ,
+	addQQMailSuffix,
+	getQQAvatar,
+	getPasswordStatus,
+	preCheckSpam,
+	checkTurnstileCaptcha,
+	getConfig,
+	getConfigForAdmin,
+	validate
 } from 'twikoo-func/utils'
 import {
-  jsonParse,
-  commentImportValine,
-  commentImportDisqus,
-  commentImportArtalk,
-  commentImportArtalk2,
-  commentImportTwikoo
+	jsonParse,
+	commentImportValine,
+	commentImportDisqus,
+	commentImportArtalk,
+	commentImportArtalk2,
+	commentImportTwikoo
 } from 'twikoo-func/utils/import'
 import { postCheckSpam } from 'twikoo-func/utils/spam'
 import { sendNotice, emailTest } from 'twikoo-func/utils/notify'
@@ -168,35 +168,35 @@ export default {
 
 function allowCors (request, headers) {
 	const origin = request.headers.get('origin')
-  if (origin) {
-    headers['Access-Control-Allow-Credentials'] = true
-    headers['Access-Control-Allow-Origin'] = getAllowedOrigin(origin)
-    headers['Access-Control-Allow-Methods'] = 'POST'
-    headers['Access-Control-Allow-Headers'] =
-      'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-    headers['Access-Control-Max-Age'] = '600'
-  }
+	if (origin) {
+		headers['Access-Control-Allow-Credentials'] = true
+		headers['Access-Control-Allow-Origin'] = getAllowedOrigin(origin)
+		headers['Access-Control-Allow-Methods'] = 'POST'
+		headers['Access-Control-Allow-Headers'] =
+			'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+		headers['Access-Control-Max-Age'] = '600'
+	}
 }
 
 function getAllowedOrigin (origin) {
-  const localhostRegex = /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d{1,5})?$/
-  if (localhostRegex.test(origin)) { // 判断是否为本地主机，如是则允许跨域
-    return origin // Allow
-  } else if (config.CORS_ALLOW_ORIGIN) { // 如设置了安全域名则检查
-    // 适配多条 CORS 规则
-    // 以逗号分隔 CORS
-    const corsList = config.CORS_ALLOW_ORIGIN.split(',')
-    // 遍历 CORS 列表
-    for (let i = 0; i < corsList.length; i++) {
-      const cors = corsList[i].replace(/\/$/, '') // 获取当前 CORS 并去除末尾的斜杠
-      if (cors === origin) {
-        return origin // Allow
-      }
-    }
-    return '' // 不在安全域名列表中则禁止跨域
-  } else {
-    return origin // 未设置安全域名直接 Allow
-  }
+	const localhostRegex = /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d{1,5})?$/
+	if (localhostRegex.test(origin)) { // 判断是否为本地主机，如是则允许跨域
+		return origin // Allow
+	} else if (config.CORS_ALLOW_ORIGIN) { // 如设置了安全域名则检查
+		// 适配多条 CORS 规则
+		// 以逗号分隔 CORS
+		const corsList = config.CORS_ALLOW_ORIGIN.split(',')
+		// 遍历 CORS 列表
+		for (let i = 0; i < corsList.length; i++) {
+			const cors = corsList[i].replace(/\/$/, '') // 获取当前 CORS 并去除末尾的斜杠
+			if (cors === origin) {
+				return origin // Allow
+			}
+		}
+		return '' // 不在安全域名列表中则禁止跨域
+	} else {
+		return origin // 未设置安全域名直接 Allow
+	}
 }
 
 function anonymousSignIn (event) {
@@ -209,33 +209,33 @@ function anonymousSignIn (event) {
 
 // 写入管理密码
 async function setPassword (event) {
-  const isAdminUser = isAdmin()
-  // 如果数据库里没有密码，则写入密码
-  // 如果数据库里有密码，则只有管理员可以写入密码
-  if (config.ADMIN_PASS && !isAdminUser) {
-    return { code: RES_CODE.PASS_EXIST, message: '请先登录再修改密码' }
-  }
-  const ADMIN_PASS = md5(event.password)
-  await writeConfig({ ADMIN_PASS })
-  return {
-    code: RES_CODE.SUCCESS
-  }
+	const isAdminUser = isAdmin()
+	// 如果数据库里没有密码，则写入密码
+	// 如果数据库里有密码，则只有管理员可以写入密码
+	if (config.ADMIN_PASS && !isAdminUser) {
+		return { code: RES_CODE.PASS_EXIST, message: '请先登录再修改密码' }
+	}
+	const ADMIN_PASS = md5(event.password)
+	await writeConfig({ ADMIN_PASS })
+	return {
+		code: RES_CODE.SUCCESS
+	}
 }
 
 // 管理员登录
 async function login (password) {
-  if (!config) {
-    return { code: RES_CODE.CONFIG_NOT_EXIST, message: '数据库无配置' }
-  }
-  if (!config.ADMIN_PASS) {
-    return { code: RES_CODE.PASS_NOT_EXIST, message: '未配置管理密码' }
-  }
-  if (config.ADMIN_PASS !== md5(password)) {
-    return { code: RES_CODE.PASS_NOT_MATCH, message: '密码错误' }
-  }
-  return {
-    code: RES_CODE.SUCCESS
-  }
+	if (!config) {
+		return { code: RES_CODE.CONFIG_NOT_EXIST, message: '数据库无配置' }
+	}
+	if (!config.ADMIN_PASS) {
+		return { code: RES_CODE.PASS_NOT_EXIST, message: '未配置管理密码' }
+	}
+	if (config.ADMIN_PASS !== md5(password)) {
+		return { code: RES_CODE.PASS_NOT_MATCH, message: '密码错误' }
+	}
+	return {
+		code: RES_CODE.SUCCESS
+	}
 }
 
 const commentCountQuery = env.DB.prepare(`
@@ -262,7 +262,7 @@ LIMIT ?6
 const replyQueryTemplate = `
 SELECT * FROM comment
 WHERE
-  url = ?1 AND
+	url = ?1 AND
 	(isSpam != ?2 OR uid = ?3) AND
 	rid IN ({{RIDS}})
 `.trim()
@@ -285,19 +285,19 @@ function parseLike (comment) {
 
 // 读取评论
 async function commentGet (event) {
-  const res = {}
-  try {
-    validate(event, ['url'])
-    const uid = getUid()
-    const isAdminUser = isAdmin()
-    const limit = parseInt(config.COMMENT_PAGE_SIZE) || 8
-    let more = false
-    const count = await commentCountQuery
+	const res = {}
+	try {
+		validate(event, ['url'])
+		const uid = getUid()
+		const isAdminUser = isAdmin()
+		const limit = parseInt(config.COMMENT_PAGE_SIZE) || 8
+		let more = false
+		const count = await commentCountQuery
 			.bind(event.url, isAdminUser ? 2 : 1, uid)
 			.first('count')
-    // 读取主楼
-    // 不包含置顶
-    let { results: main } = await commentQuery
+		// 读取主楼
+		// 不包含置顶
+		let { results: main } = await commentQuery
 			.bind(
 				event.url, isAdminUser ? 2 : 1, uid,
 				event.before ?? MAX_TIMESTAMP_MILLIS, 0,
@@ -305,39 +305,39 @@ async function commentGet (event) {
 				limit + 1
 			).all()
 
-    if (main.length > limit) {
-      // 还有更多评论
-      more = true
-      // 删除多读的 1 条
-      main.splice(limit, 1)
-    }
-    let top = []
-    if (!config.TOP_DISABLED && !event.before) {
-      // 查询置顶评论
-      top = (await commentQuery
+		if (main.length > limit) {
+			// 还有更多评论
+			more = true
+			// 删除多读的 1 条
+			main.splice(limit, 1)
+		}
+		let top = []
+		if (!config.TOP_DISABLED && !event.before) {
+			// 查询置顶评论
+			top = (await commentQuery
 				.bind(
 					event.url, isAdminUser ? 2 : 1, uid, MAX_TIMESTAMP_MILLIS, 1,
 					MAX_QUERY_LIMIT
 				).all()).results
-      // 合并置顶评论和非置顶评论
-      main = [
-        ...top,
-        ...main
-      ]
-    }
-    // 读取回复楼
-    const { results: reply } = await getReplyQuery(main.length)
+			// 合并置顶评论和非置顶评论
+			main = [
+				...top,
+				...main
+			]
+		}
+		// 读取回复楼
+		const { results: reply } = await getReplyQuery(main.length)
 			.bind(
 				event.url, isAdminUser ? 2 : 1, uid, ...main.map((item) => item._id)
 			).all()
-    res.data = parseComment([...main, ...reply].map(parseLike), uid, config)
-    res.more = more
-    res.count = count
-  } catch (e) {
-    res.data = []
-    res.message = e.message
-  }
-  return res
+		res.data = parseComment([...main, ...reply].map(parseLike), uid, config)
+		res.more = more
+		res.count = count
+	} catch (e) {
+		res.data = []
+		res.message = e.message
+	}
+	return res
 }
 
 const commentForAdminCountQuery = env.DB.prepare(`
@@ -370,31 +370,31 @@ LIMIT ?3 OFFSET ?4
 
 // 管理员读取评论
 async function commentGetForAdmin (event) {
-  const res = {}
-  const isAdminUser = isAdmin()
-  if (isAdminUser) {
-    validate(event, ['per', 'page'])
-    const count = await commentForAdminCountQuery
+	const res = {}
+	const isAdminUser = isAdmin()
+	if (isAdminUser) {
+		validate(event, ['per', 'page'])
+		const count = await commentForAdminCountQuery
 			.bind(
 				event.type === 'VISIBLE' ? 1 :
 				event.type === 'HIDDEN' ? 0 :
 				2,
 				`%${event.keyword ?? ''}%`
 			).first('total')
-    const { results: data } = commentForAdminQuery.bind(
+		const { results: data } = commentForAdminQuery.bind(
 			event.type === 'VISIBLE' ? 1 :
 			event.type === 'HIDDEN' ? 0 :
 			2,
 			`%${event.keyword ?? ''}%`
 		).all()
-    res.code = RES_CODE.SUCCESS
-    res.count = count
-    res.data = parseCommentForAdmin(data)
-  } else {
-    res.code = RES_CODE.NEED_LOGIN
-    res.message = '请先登录'
-  }
-  return res
+		res.code = RES_CODE.SUCCESS
+		res.count = count
+		res.data = parseCommentForAdmin(data)
+	} else {
+		res.code = RES_CODE.NEED_LOGIN
+		res.message = '请先登录'
+	}
+	return res
 }
 
 const commentSetStmtTemplate = `
@@ -418,137 +418,137 @@ function getCommentSetStmt (fields) {
 
 // 管理员修改评论
 async function commentSetForAdmin (event) {
-  const res = {}
-  const isAdminUser = isAdmin()
-  if (isAdminUser) {
-    validate(event, ['id', 'set'])
+	const res = {}
+	const isAdminUser = isAdmin()
+	if (isAdminUser) {
+		validate(event, ['id', 'set'])
 		const fields = Object.keys(event.set).sort()
-    await getCommentSetStmt(fields).bind(
+		await getCommentSetStmt(fields).bind(
 			event.id, ...fields.map(field => event.set[field])
 		).run()
-    res.code = RES_CODE.SUCCESS
-  } else {
-    res.code = RES_CODE.NEED_LOGIN
-    res.message = '请先登录'
-  }
-  return res
+		res.code = RES_CODE.SUCCESS
+	} else {
+		res.code = RES_CODE.NEED_LOGIN
+		res.message = '请先登录'
+	}
+	return res
 }
 
 const commentDeleteStmt = env.DB.prepare('DELETE FROM comment WHERE _id = ?1')
 
 // 管理员删除评论
 async function commentDeleteForAdmin (event) {
-  const res = {}
-  const isAdminUser = isAdmin()
-  if (isAdminUser) {
-    validate(event, ['id'])
+	const res = {}
+	const isAdminUser = isAdmin()
+	if (isAdminUser) {
+		validate(event, ['id'])
 		await commentDeleteStmt.bind(event.id).run()
-    res.code = RES_CODE.SUCCESS
-  } else {
-    res.code = RES_CODE.NEED_LOGIN
-    res.message = '请先登录'
-  }
-  return res
+		res.code = RES_CODE.SUCCESS
+	} else {
+		res.code = RES_CODE.NEED_LOGIN
+		res.message = '请先登录'
+	}
+	return res
 }
 
 // 管理员导入评论
 async function commentImportForAdmin (event) {
-  const res = {}
-  let logText = ''
-  const log = (message) => {
-    logText += `${new Date().toLocaleString()} ${message}\n`
-  }
-  const isAdminUser = isAdmin()
-  if (isAdminUser) {
-    try {
-      validate(event, ['source', 'file'])
-      log(`开始导入 ${event.source}`)
-      let comments
-      switch (event.source) {
-        case 'valine': {
-          const valineDb = await readFile(event.file, 'json', log)
-          comments = await commentImportValine(valineDb, log)
-          break
-        }
-        case 'disqus': {
-          const disqusDb = await readFile(event.file, 'xml', log)
-          comments = await commentImportDisqus(disqusDb, log)
-          break
-        }
-        case 'artalk': {
-          const artalkDb = await readFile(event.file, 'json', log)
-          comments = await commentImportArtalk(artalkDb, log)
-          break
-        }
-        case 'artalk2': {
-          const artalkDb = await readFile(event.file, 'json', log)
-          comments = await commentImportArtalk2(artalkDb, log)
-          break
-        }
-        case 'twikoo': {
-          const twikooDb = await readFile(event.file, 'json', log)
-          comments = await commentImportTwikoo(twikooDb, log)
-          break
-        }
-        default:
-          throw new Error(`不支持 ${event.source} 的导入，请更新 Twikoo 云函数至最新版本`)
-      }
+	const res = {}
+	let logText = ''
+	const log = (message) => {
+		logText += `${new Date().toLocaleString()} ${message}\n`
+	}
+	const isAdminUser = isAdmin()
+	if (isAdminUser) {
+		try {
+			validate(event, ['source', 'file'])
+			log(`开始导入 ${event.source}`)
+			let comments
+			switch (event.source) {
+				case 'valine': {
+					const valineDb = await readFile(event.file, 'json', log)
+					comments = await commentImportValine(valineDb, log)
+					break
+				}
+				case 'disqus': {
+					const disqusDb = await readFile(event.file, 'xml', log)
+					comments = await commentImportDisqus(disqusDb, log)
+					break
+				}
+				case 'artalk': {
+					const artalkDb = await readFile(event.file, 'json', log)
+					comments = await commentImportArtalk(artalkDb, log)
+					break
+				}
+				case 'artalk2': {
+					const artalkDb = await readFile(event.file, 'json', log)
+					comments = await commentImportArtalk2(artalkDb, log)
+					break
+				}
+				case 'twikoo': {
+					const twikooDb = await readFile(event.file, 'json', log)
+					comments = await commentImportTwikoo(twikooDb, log)
+					break
+				}
+				default:
+					throw new Error(`不支持 ${event.source} 的导入，请更新 Twikoo 云函数至最新版本`)
+			}
 			// TODO: 考虑并行导入
 			for (const comment of comments) await save(comment)
-      log(`导入成功`)
-    } catch (e) {
-      log(e.message)
-    }
-    res.code = RES_CODE.SUCCESS
-    res.log = logText
-    logger.info(logText)
-  } else {
-    res.code = RES_CODE.NEED_LOGIN
-    res.message = '请先登录'
-  }
-  return res
+			log(`导入成功`)
+		} catch (e) {
+			log(e.message)
+		}
+		res.code = RES_CODE.SUCCESS
+		res.log = logText
+		logger.info(logText)
+	} else {
+		res.code = RES_CODE.NEED_LOGIN
+		res.message = '请先登录'
+	}
+	return res
 }
 
 const commentExportQuery = env.DB.prepare('SELECT * FROM comment')
 
 async function commentExportForAdmin () {
-  const res = {}
-  const isAdminUser = isAdmin()
-  if (isAdminUser) {
-    const { results: data } = await commentExportQuery.all()
-    res.code = RES_CODE.SUCCESS
-    res.data = data
-  } else {
-    res.code = RES_CODE.NEED_LOGIN
-    res.message = '请先登录'
-  }
-  return res
+	const res = {}
+	const isAdminUser = isAdmin()
+	if (isAdminUser) {
+		const { results: data } = await commentExportQuery.all()
+		res.code = RES_CODE.SUCCESS
+		res.data = data
+	} else {
+		res.code = RES_CODE.NEED_LOGIN
+		res.message = '请先登录'
+	}
+	return res
 }
 
 // 读取文件并转为 js object
 async function readFile (file, type, log) {
-  try {
-    let content = file.toString('utf8')
-    log('评论文件读取成功')
-    if (type === 'json') {
-      content = jsonParse(content)
-      log('评论文件 JSON 解析成功')
-    } else if (type === 'xml') {
-      content = await xml2js.parseStringPromise(content)
-      log('评论文件 XML 解析成功')
-    }
-    return content
-  } catch (e) {
-    log(`评论文件读取失败：${e.message}`)
-  }
+	try {
+		let content = file.toString('utf8')
+		log('评论文件读取成功')
+		if (type === 'json') {
+			content = jsonParse(content)
+			log('评论文件 JSON 解析成功')
+		} else if (type === 'xml') {
+			content = await xml2js.parseStringPromise(content)
+			log('评论文件 XML 解析成功')
+		}
+		return content
+	} catch (e) {
+		log(`评论文件读取失败：${e.message}`)
+	}
 }
 
 // 点赞 / 取消点赞
 async function commentLike (event) {
-  const res = {}
-  validate(event, ['id'])
-  await like(event.id, getUid())
-  return res
+	const res = {}
+	validate(event, ['id'])
+	await like(event.id, getUid())
+	return res
 }
 
 const commentByIdQuery = env.DB.prepare('SELECT * FROM comment WHERE _id = ?1')
@@ -556,16 +556,16 @@ const updateLikeStmt = env.DB.prepare('UPDATE comment SET like = ?2 WHERE _id = 
 
 // 点赞 / 取消点赞
 async function like (id, uid) {
-  const comment = await commentByIdQuery.bind(id).first()
+	const comment = await commentByIdQuery.bind(id).first()
 	if (!comment) return
-  let likes = JSON.parse(comment.like)
-  if (likes.findIndex((item) => item === uid) === -1) {
-    // 赞
-    likes.push(uid)
-  } else {
-    // 取消赞
-    likes = likes.filter((item) => item !== uid)
-  }
+	let likes = JSON.parse(comment.like)
+	if (likes.findIndex((item) => item === uid) === -1) {
+		// 赞
+		likes.push(uid)
+	} else {
+		// 取消赞
+		likes = likes.filter((item) => item !== uid)
+	}
 	await updateLikeStmt.bind(id, JSON.stringify(likes))
 }
 
@@ -586,36 +586,36 @@ async function like (id, uid) {
  * @param {String} event.rid 评论楼 ID
  */
 async function commentSubmit (event, request) {
-  const res = {}
-  // 参数校验
-  validate(event, ['url', 'ua', 'comment'])
-  // 限流
-  await limitFilter(request)
-  // 验证码
-  await checkCaptcha(event, request)
-  // 预检测、转换
-  const data = await parse(event, request)
-  // 保存
-  const comment = await save(data)
-  res.id = comment.id
-  // 异步垃圾检测、发送评论通知
-  try {
-    logger.log('开始异步垃圾检测、发送评论通知')
-    logger.log('POST_SUBMIT')
-    await Promise.race([
+	const res = {}
+	// 参数校验
+	validate(event, ['url', 'ua', 'comment'])
+	// 限流
+	await limitFilter(request)
+	// 验证码
+	await checkCaptcha(event, request)
+	// 预检测、转换
+	const data = await parse(event, request)
+	// 保存
+	const comment = await save(data)
+	res.id = comment.id
+	// 异步垃圾检测、发送评论通知
+	try {
+		logger.log('开始异步垃圾检测、发送评论通知')
+		logger.log('POST_SUBMIT')
+		await Promise.race([
 			fetch('/', {
 				method: 'POST',
 				body: { event: 'POST_SUBMIT', comment },
 				headers: { 'x-twikoo-recursion': config.ADMIN_PASS || 'true' },
 			}),
-      // 如果超过 5 秒还没收到异步返回，直接继续，减少用户等待的时间
-      new Promise((resolve) => setTimeout(resolve, 5000))
-    ])
-    logger.log('POST_SUBMIT')
-  } catch (e) {
-    logger.error('POST_SUBMIT 失败', e.message)
-  }
-  return res
+			// 如果超过 5 秒还没收到异步返回，直接继续，减少用户等待的时间
+			new Promise((resolve) => setTimeout(resolve, 5000))
+		])
+		logger.log('POST_SUBMIT')
+	} catch (e) {
+		logger.error('POST_SUBMIT 失败', e.message)
+	}
+	return res
 }
 
 const saveCommentStmt = env.DB.prepare(`
@@ -644,46 +644,46 @@ async function getParentComment (currentComment) {
 
 // 异步垃圾检测、发送评论通知
 async function postSubmit (comment, request) {
-  if (!isRecursion(request)) return { code: RES_CODE.FORBIDDEN }
-  // 垃圾检测
-  const isSpam = await postCheckSpam(comment, config)
-  await saveSpamCheckResult(comment, isSpam)
-  // 发送通知
-  await sendNotice(comment, config, getParentComment)
-  return { code: RES_CODE.SUCCESS }
+	if (!isRecursion(request)) return { code: RES_CODE.FORBIDDEN }
+	// 垃圾检测
+	const isSpam = await postCheckSpam(comment, config)
+	await saveSpamCheckResult(comment, isSpam)
+	// 发送通知
+	await sendNotice(comment, config, getParentComment)
+	return { code: RES_CODE.SUCCESS }
 }
 
 // 将评论转为数据库存储格式
 async function parse (comment, request) {
-  const timestamp = Date.now()
-  const isAdminUser = isAdmin()
-  const isBloggerMail = equalsMail(comment.mail, config.BLOGGER_EMAIL)
-  if (isBloggerMail && !isAdminUser) throw new Error('请先登录管理面板，再使用博主身份发送评论')
-  const commentDo = {
-    _id: uuidv4().replace(/-/g, ''),
-    uid: getUid(),
-    nick: comment.nick ? comment.nick : '匿名',
-    mail: comment.mail ? comment.mail : '',
-    mailMd5: comment.mail ? md5(normalizeMail(comment.mail)) : '',
-    link: comment.link ? comment.link : '',
-    ua: comment.ua,
-    ip: getIp(request),
-    master: isBloggerMail,
-    url: comment.url,
-    href: comment.href,
-    comment: comment.comment,
-    pid: comment.pid ? comment.pid : comment.rid,
-    rid: comment.rid,
-    isSpam: isAdminUser ? false : preCheckSpam(comment, config),
-    created: timestamp,
-    updated: timestamp
-  }
-  if (isQQ(comment.mail)) {
-    commentDo.mail = addQQMailSuffix(comment.mail)
-    commentDo.mailMd5 = md5(normalizeMail(commentDo.mail))
-    commentDo.avatar = await getQQAvatar(comment.mail)
-  }
-  return commentDo
+	const timestamp = Date.now()
+	const isAdminUser = isAdmin()
+	const isBloggerMail = equalsMail(comment.mail, config.BLOGGER_EMAIL)
+	if (isBloggerMail && !isAdminUser) throw new Error('请先登录管理面板，再使用博主身份发送评论')
+	const commentDo = {
+		_id: uuidv4().replace(/-/g, ''),
+		uid: getUid(),
+		nick: comment.nick ? comment.nick : '匿名',
+		mail: comment.mail ? comment.mail : '',
+		mailMd5: comment.mail ? md5(normalizeMail(comment.mail)) : '',
+		link: comment.link ? comment.link : '',
+		ua: comment.ua,
+		ip: getIp(request),
+		master: isBloggerMail,
+		url: comment.url,
+		href: comment.href,
+		comment: comment.comment,
+		pid: comment.pid ? comment.pid : comment.rid,
+		rid: comment.rid,
+		isSpam: isAdminUser ? false : preCheckSpam(comment, config),
+		created: timestamp,
+		updated: timestamp
+	}
+	if (isQQ(comment.mail)) {
+		commentDo.mail = addQQMailSuffix(comment.mail)
+		commentDo.mailMd5 = md5(normalizeMail(commentDo.mail))
+		commentDo.avatar = await getQQAvatar(comment.mail)
+	}
+	return commentDo
 }
 
 const commentCountSinceByIpQuery = env.DB.prepare(`
@@ -698,12 +698,12 @@ WHERE created > ?1
 
 // 限流
 async function limitFilter (request) {
-  // 限制每个 IP 每 10 分钟发表的评论数量
-  let limitPerMinute = parseInt(config.LIMIT_PER_MINUTE)
-  if (Number.isNaN(limitPerMinute)) limitPerMinute = 10
-  // 限制所有 IP 每 10 分钟发表的评论数量
-  let limitPerMinuteAll = parseInt(config.LIMIT_PER_MINUTE_ALL)
-  if (Number.isNaN(limitPerMinuteAll)) limitPerMinuteAll = 10
+	// 限制每个 IP 每 10 分钟发表的评论数量
+	let limitPerMinute = parseInt(config.LIMIT_PER_MINUTE)
+	if (Number.isNaN(limitPerMinute)) limitPerMinute = 10
+	// 限制所有 IP 每 10 分钟发表的评论数量
+	let limitPerMinuteAll = parseInt(config.LIMIT_PER_MINUTE_ALL)
+	if (Number.isNaN(limitPerMinuteAll)) limitPerMinuteAll = 10
 
 	const getCountByIp = async () => limitPerMinute ?
 		commentCountSinceByIpQuery.bind(
@@ -713,18 +713,18 @@ async function limitFilter (request) {
 		commentCountSinceQuery.bind(Date.now() - 600000).first('count') : 0
 	const [countByIp, count] = Promise.all([getCountByIp(), getCount()])
 
-  if (countByIp > limitPerMinute) throw new Error('发言频率过高')
-  if (count > limitPerMinuteAll) throw new Error('评论太火爆啦 >_< 请稍后再试')
+	if (countByIp > limitPerMinute) throw new Error('发言频率过高')
+	if (count > limitPerMinuteAll) throw new Error('评论太火爆啦 >_< 请稍后再试')
 }
 
 async function checkCaptcha (comment, request) {
-  if (config.TURNSTILE_SITE_KEY && config.TURNSTILE_SECRET_KEY) {
-    await checkTurnstileCaptcha({
-      ip: getIp(request),
-      turnstileToken: comment.turnstileToken,
-      turnstileTokenSecretKey: config.TURNSTILE_SECRET_KEY
-    })
-  }
+	if (config.TURNSTILE_SITE_KEY && config.TURNSTILE_SECRET_KEY) {
+		await checkTurnstileCaptcha({
+			ip: getIp(request),
+			turnstileToken: comment.turnstileToken,
+			turnstileTokenSecretKey: config.TURNSTILE_SECRET_KEY
+		})
+	}
 }
 
 const updateIsSpamStmt = env.DB.prepare(`
@@ -732,7 +732,7 @@ UPDATE comment SET isSpam = ?2, updated = ?3 WHERE _id = ?1
 `.trim())
 
 async function saveSpamCheckResult (comment, isSpam) {
-  comment.isSpam = isSpam
+	comment.isSpam = isSpam
 	await updateIsSpamStmt.bind(comment._id, isSpam, Date.now()).run()
 }
 
@@ -749,16 +749,16 @@ const counterQuery = env.DB.prepare('SELECT time FROM counter WHERE url = ?1')
  * @param {String} event.url 文章地址
  */
 async function counterGet (event) {
-  const res = {}
-  try {
-    validate(event, ['url'])
+	const res = {}
+	try {
+		validate(event, ['url'])
 		await incCounterStmt.bind(event.url, event.title, Date.now()).run()
-    res.time = await counterQuery.bind(event.url).first('time')
-  } catch (e) {
-    res.message = e.message
-    return res
-  }
-  return res
+		res.time = await counterQuery.bind(event.url).first('time')
+	} catch (e) {
+		res.message = e.message
+		return res
+	}
+	return res
 }
 
 const commentCountByUrlQuery = env.DB.prepare(`
@@ -772,21 +772,21 @@ WHERE url = ?1 AND NOT isSpam AND (?2 OR rid = "")
  * @param {Boolean} event.includeReply 评论数是否包括回复，默认：false
  */
 async function getCommentsCount (event) {
-  const res = {}
-  try {
-    validate(event, ['urls'])
+	const res = {}
+	try {
+		validate(event, ['urls'])
 		res.data = await Promise.all(event.urls.map(
 			async (url) => ({
 				url,
 				count: await commentCountByUrlQuery
 					.bind(url, event.includeReply)
-					.first("count"),
+					.first('count'),
 			})))
-  } catch (e) {
-    res.message = e.message
-    return res
-  }
-  return res
+	} catch (e) {
+		res.message = e.message
+		return res
+	}
+	return res
 }
 
 const recentCommentsByUrlQuery = env.DB.prepare(`
@@ -803,8 +803,8 @@ LIMIT ?4
  * @param {Boolean} event.includeReply 评论数是否包括回复，默认：false
  */
 async function getRecentComments (event) {
-  const res = {}
-  try {
+	const res = {}
+	try {
 		if (event.pageSize > 100) event.pageSize = 100
 		let result
 		if (event.urls && event.urls.length) {
@@ -818,52 +818,52 @@ async function getRecentComments (event) {
 				).all()
 			))).flat()
 		}
-    res.data = result.map((comment) => {
-      return {
-        id: comment._id.toString(),
-        url: comment.url,
-        nick: comment.nick,
-        avatar: getAvatar(comment, config),
-        mailMd5: getMailMd5(comment),
-        link: comment.link,
-        comment: comment.comment,
-        commentText: $(comment.comment).text(),
-        created: comment.created
-      }
-    })
-  } catch (e) {
-    res.message = e.message
-    return res
-  }
-  return res
+		res.data = result.map((comment) => {
+			return {
+				id: comment._id.toString(),
+				url: comment.url,
+				nick: comment.nick,
+				avatar: getAvatar(comment, config),
+				mailMd5: getMailMd5(comment),
+				link: comment.link,
+				comment: comment.comment,
+				commentText: $(comment.comment).text(),
+				created: comment.created
+			}
+		})
+	} catch (e) {
+		res.message = e.message
+		return res
+	}
+	return res
 }
 
 // 修改配置
 async function setConfig (event) {
-  const isAdminUser = isAdmin()
-  if (isAdminUser) {
-    await writeConfig(event.config)
-    return {
-      code: RES_CODE.SUCCESS
-    }
-  } else {
-    return {
-      code: RES_CODE.NEED_LOGIN,
-      message: '请先登录'
-    }
-  }
+	const isAdminUser = isAdmin()
+	if (isAdminUser) {
+		await writeConfig(event.config)
+		return {
+			code: RES_CODE.SUCCESS
+		}
+	} else {
+		return {
+			code: RES_CODE.NEED_LOGIN,
+			message: '请先登录'
+		}
+	}
 }
 
 function protect (request) {
-  // 防御
-  const ip = getIp(request)
-  requestTimes[ip] = (requestTimes[ip] || 0) + 1
-  if (requestTimes[ip] > MAX_REQUEST_TIMES) {
-    logger.warn(`${ip} 当前请求次数为 ${requestTimes[ip]}，已超过最大请求次数`)
-    throw new Error('Too Many Requests')
-  } else {
-    logger.log(`${ip} 当前请求次数为 ${requestTimes[ip]}`)
-  }
+	// 防御
+	const ip = getIp(request)
+	requestTimes[ip] = (requestTimes[ip] || 0) + 1
+	if (requestTimes[ip] > MAX_REQUEST_TIMES) {
+		logger.warn(`${ip} 当前请求次数为 ${requestTimes[ip]}，已超过最大请求次数`)
+		throw new Error('Too Many Requests')
+	} else {
+		logger.log(`${ip} 当前请求次数为 ${requestTimes[ip]}`)
+	}
 }
 
 const readConfigQuery = env.DB.prepare('SELECT value FROM config LIMIT 1')
@@ -878,30 +878,30 @@ const writeConfigStmt = env.DB.prepare('UPDATE config SET value = ?1')
 
 // 写入配置
 async function writeConfig (newConfig) {
-  if (!Object.keys(newConfig).length) return
-  logger.info('写入配置：', newConfig)
-  try {
+	if (!Object.keys(newConfig).length) return
+	logger.info('写入配置：', newConfig)
+	try {
 		const config = { ...await readConfig(), ...newConfig }
-    await writeConfigStmt.bind(JSON.stringify(config))
-  } catch (e) {
-    logger.error('写入配置失败：', e)
-  }
+		await writeConfigStmt.bind(JSON.stringify(config))
+	} catch (e) {
+		logger.error('写入配置失败：', e)
+	}
 }
 
 // 获取用户 ID
 function getUid () {
-  return accessToken
+	return accessToken
 }
 
 // 判断用户是否管理员
 function isAdmin () {
-  const uid = getUid()
-  return config.ADMIN_PASS === md5(uid)
+	const uid = getUid()
+	return config.ADMIN_PASS === md5(uid)
 }
 
 // 判断是否为递归调用（即云函数调用自身）
 function isRecursion (request) {
-  return request.headers['x-twikoo-recursion'] === (config.ADMIN_PASS || 'true')
+	return request.headers['x-twikoo-recursion'] === (config.ADMIN_PASS || 'true')
 }
 
 function getIp (request) {
