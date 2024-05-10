@@ -1,5 +1,6 @@
 DROP TABLE IF EXISTS comment;
 CREATE TABLE IF NOT EXISTS comment (
+  _id TEXT NOT NULL,
   uid TEXT NOT NULL,
   nick TEXT NOT NULL,
   mail TEXT NOT NULL,
@@ -17,8 +18,13 @@ CREATE TABLE IF NOT EXISTS comment (
   created INTEGER NOT NULL,
   updated INTEGER NOT NULL,
   like TEXT NOT NULL,
+  top INTEGER NOT NULL,
+  avatar TEXT NOT NULL,
   PRIMARY KEY (url, created DESC)
 );
+
+CREATE INDEX idx_comment_created ON comment (created DESC)
+CREATE INDEX idx_comment_ip_created ON comment (ip, created DESC)
 
 DROP TABLE IF EXISTS config;
 CREATE TABLE IF NOT EXISTS config (

@@ -2,7 +2,8 @@
 name = "twikoo-cloudflare"
 main = "src/index.js"
 compatibility_date = "2024-05-02"
-compatibility_flags = ["nodejs_compat"]
+# compatibility_flags = ["nodejs_compat"]
+node_compat = true
 
 [[d1_databases]]
 binding = "DB" # available in your Worker on env.DB

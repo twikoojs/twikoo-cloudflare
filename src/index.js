@@ -1,25 +1,17 @@
 /*!
- * Twikoo vercel function
- * (c) 2020-present iMaeGoo
+ * Twikoo Cloudflare worker
+ * (c) 2024-present iMaeGoo
  * Released under the MIT License.
  */
 
-const { version: VERSION } = require('../package.json')
-const MongoClient = require('mongodb').MongoClient
-const getUserIP = require('get-user-ip')
-const { URL } = require('url')
-const { v4: uuidv4 } = require('uuid') // 用户 id 生成
-const {
+import { v4 as uuidv4 } from 'uuid' // 用户 id 生成
+import {
   $,
-  axios,
-  getDomPurify,
   md5,
   xml2js
-} = require('twikoo-func/utils/lib')
-const {
+} from 'twikoo-func/utils/lib'
+import {
   getFuncVersion,
-  getUrlQuery,
-  getUrlsQuery,
   parseComment,
   parseCommentForAdmin,
   normalizeMail,
@@ -35,152 +27,161 @@ const {
   getConfig,
   getConfigForAdmin,
   validate
-} = require('twikoo-func/utils')
-const {
+} from 'twikoo-func/utils'
+import {
   jsonParse,
   commentImportValine,
   commentImportDisqus,
   commentImportArtalk,
   commentImportArtalk2,
   commentImportTwikoo
-} = require('twikoo-func/utils/import')
-const { postCheckSpam } = require('twikoo-func/utils/spam')
-const { sendNotice, emailTest } = require('twikoo-func/utils/notify')
-const { uploadImage } = require('twikoo-func/utils/image')
-const logger = require('twikoo-func/utils/logger')
-
-const DOMPurify = getDomPurify()
+} from 'twikoo-func/utils/import'
+import { postCheckSpam } from 'twikoo-func/utils/spam'
+import { sendNotice, emailTest } from 'twikoo-func/utils/notify'
+import { uploadImage } from 'twikoo-func/utils/image'
+import logger from 'twikoo-func/utils/logger'
 
 // 常量 / constants
-const { RES_CODE, MAX_REQUEST_TIMES } = require('twikoo-func/utils/constants')
+import constants from 'twikoo-func/utils/constants'
+
+const { RES_CODE, MAX_REQUEST_TIMES } = constants
+const VERSION = '1.6.32'
 
 // 全局变量 / variables
-let db = null
 let config
 let accessToken
 const requestTimes = {}
 
-module.exports = async (request, response) => {
-  const event = request.body || {}
-  logger.log('请求 IP：', getIp(request))
-  logger.log('请求函数：', event.event)
-  logger.log('请求参数：', event)
-  let res = {}
-  try {
-    protect(request)
-    accessToken = anonymousSignIn(request)
-    await connectToDatabase(process.env.MONGODB_URI)
-    await readConfig()
-    allowCors(request, response)
-    if (request.method === 'OPTIONS') {
-      response.status(204).end()
-      return
-    }
-    switch (event.event) {
-      case 'GET_FUNC_VERSION':
-        res = getFuncVersion({ VERSION })
-        break
-      case 'COMMENT_GET':
-        res = await commentGet(event)
-        break
-      case 'COMMENT_GET_FOR_ADMIN':
-        res = await commentGetForAdmin(event)
-        break
-      case 'COMMENT_SET_FOR_ADMIN':
-        res = await commentSetForAdmin(event)
-        break
-      case 'COMMENT_DELETE_FOR_ADMIN':
-        res = await commentDeleteForAdmin(event)
-        break
-      case 'COMMENT_IMPORT_FOR_ADMIN':
-        res = await commentImportForAdmin(event)
-        break
-      case 'COMMENT_LIKE':
-        res = await commentLike(event)
-        break
-      case 'COMMENT_SUBMIT':
-        res = await commentSubmit(event, request)
-        break
-      case 'POST_SUBMIT':
-        res = await postSubmit(event.comment, request)
-        break
-      case 'COUNTER_GET':
-        res = await counterGet(event)
-        break
-      case 'GET_PASSWORD_STATUS':
-        res = await getPasswordStatus(config, VERSION)
-        break
-      case 'SET_PASSWORD':
-        res = await setPassword(event)
-        break
-      case 'GET_CONFIG':
-        res = await getConfig({ config, VERSION, isAdmin: isAdmin() })
-        break
-      case 'GET_CONFIG_FOR_ADMIN':
-        res = await getConfigForAdmin({ config, isAdmin: isAdmin() })
-        break
-      case 'SET_CONFIG':
-        res = await setConfig(event)
-        break
-      case 'LOGIN':
-        res = await login(event.password)
-        break
-      case 'GET_COMMENTS_COUNT': // >= 0.2.7
-        res = await getCommentsCount(event)
-        break
-      case 'GET_RECENT_COMMENTS': // >= 0.2.7
-        res = await getRecentComments(event)
-        break
-      case 'EMAIL_TEST': // >= 1.4.6
-        res = await emailTest(event, config, isAdmin())
-        break
-      case 'UPLOAD_IMAGE': // >= 1.5.0
-        res = await uploadImage(event, config)
-        break
-      case 'COMMENT_EXPORT_FOR_ADMIN': // >= 1.6.13
-        res = await commentExportForAdmin(event)
-        break
-      default:
-        if (event.event) {
-          res.code = RES_CODE.EVENT_NOT_EXIST
-          res.message = '请更新 Twikoo 云函数至最新版本'
-        } else {
-          res.code = RES_CODE.NO_PARAM
-          res.message = 'Twikoo 云函数运行正常，请参考 https://twikoo.js.org/frontend.html 完成前端的配置'
-          res.version = VERSION
-        }
-    }
-  } catch (e) {
-    logger.error('Twikoo 遇到错误，请参考以下错误信息。如有疑问，请反馈至 https://github.com/twikoojs/twikoo/issues')
-    logger.error('请求参数：', event)
-    logger.error('错误信息：', e)
-    res.code = RES_CODE.FAIL
-    res.message = e.message
-  }
-  if (!res.code && !request.body.accessToken) {
-    res.accessToken = accessToken
-  }
-  logger.log('请求返回：', res)
-  response.status(200).json(res)
+export default {
+	/**
+	 * @param {Request} request
+	 * @returns {Response}
+	 */
+	async fetch(request) {
+		let event
+		try {
+			event = await request.json()
+		} catch {
+			event = {}
+		}
+		// logger.log('请求 IP：', getIp(request))
+		logger.log('请求函数：', event.event)
+		logger.log('请求参数：', event)
+		let res = {}
+		const headers = {}
+		try {
+			protect(request)
+			accessToken = anonymousSignIn(event)
+			await readConfig()
+			allowCors(request, headers)
+			if (request.method === 'OPTIONS') {
+				return new Response(null, { status: 204, headers })
+			}
+			switch (event.event) {
+				case 'GET_FUNC_VERSION':
+					res = getFuncVersion({ VERSION })
+					break
+				case 'COMMENT_GET':
+					res = await commentGet(event)
+					break
+				case 'COMMENT_GET_FOR_ADMIN':
+					res = await commentGetForAdmin(event)
+					break
+				case 'COMMENT_SET_FOR_ADMIN':
+					res = await commentSetForAdmin(event)
+					break
+				case 'COMMENT_DELETE_FOR_ADMIN':
+					res = await commentDeleteForAdmin(event)
+					break
+				case 'COMMENT_IMPORT_FOR_ADMIN':
+					res = await commentImportForAdmin(event)
+					break
+				case 'COMMENT_LIKE':
+					res = await commentLike(event)
+					break
+				case 'COMMENT_SUBMIT':
+					res = await commentSubmit(event, request)
+					break
+				case 'POST_SUBMIT':
+					res = await postSubmit(event.comment, request)
+					break
+				case 'COUNTER_GET':
+					res = await counterGet(event)
+					break
+				case 'GET_PASSWORD_STATUS':
+					res = await getPasswordStatus(config, VERSION)
+					break
+				case 'SET_PASSWORD':
+					res = await setPassword(event)
+					break
+				case 'GET_CONFIG':
+					res = await getConfig({ config, VERSION, isAdmin: isAdmin() })
+					break
+				case 'GET_CONFIG_FOR_ADMIN':
+					res = await getConfigForAdmin({ config, isAdmin: isAdmin() })
+					break
+				case 'SET_CONFIG':
+					res = await setConfig(event)
+					break
+				case 'LOGIN':
+					res = await login(event.password)
+					break
+				case 'GET_COMMENTS_COUNT': // >= 0.2.7
+					res = await getCommentsCount(event)
+					break
+				case 'GET_RECENT_COMMENTS': // >= 0.2.7
+					res = await getRecentComments(event)
+					break
+				case 'EMAIL_TEST': // >= 1.4.6
+					res = await emailTest(event, config, isAdmin())
+					break
+				case 'UPLOAD_IMAGE': // >= 1.5.0
+					res = await uploadImage(event, config)
+					break
+				case 'COMMENT_EXPORT_FOR_ADMIN': // >= 1.6.13
+					res = await commentExportForAdmin(event)
+					break
+				default:
+					if (event.event) {
+						res.code = RES_CODE.EVENT_NOT_EXIST
+						res.message = '请更新 Twikoo 云函数至最新版本'
+					} else {
+						res.code = RES_CODE.NO_PARAM
+						res.message = 'Twikoo 云函数运行正常，请参考 https://twikoo.js.org/frontend.html 完成前端的配置'
+						res.version = VERSION
+					}
+			}
+		} catch (e) {
+			logger.error('Twikoo 遇到错误，请参考以下错误信息。如有疑问，请反馈至 https://github.com/twikoojs/twikoo/issues')
+			logger.error('请求参数：', event)
+			logger.error('错误信息：', e)
+			res.code = RES_CODE.FAIL
+			res.message = e.message
+		}
+		if (!res.code && !request.body.accessToken) {
+			res.accessToken = accessToken
+		}
+		logger.log('请求返回：', res)
+		response.status(200).json(res)
+	}
 }
 
-function allowCors (request, response) {
-  if (request.headers.origin) {
-    response.setHeader('Access-Control-Allow-Credentials', true)
-    response.setHeader('Access-Control-Allow-Origin', getAllowedOrigin(request))
-    response.setHeader('Access-Control-Allow-Methods', 'POST')
-    response.setHeader(
-      'Access-Control-Allow-Headers',
+function allowCors (request, headers) {
+	const origin = request.headers.get('origin')
+  if (origin) {
+    headers['Access-Control-Allow-Credentials'] = true
+    headers['Access-Control-Allow-Origin'] = getAllowedOrigin(origin)
+    headers['Access-Control-Allow-Methods'] = 'POST'
+    headers['Access-Control-Allow-Headers'] =
       'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-    )
-    response.setHeader('Access-Control-Max-Age', '600')
+    headers['Access-Control-Max-Age'] = '600'
   }
 }
 
-function getAllowedOrigin (request) {
+function getAllowedOrigin (origin) {
   const localhostRegex = /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d{1,5})?$/
-  if (localhostRegex.test(request.headers.origin)) { // 判断是否为本地主机，如是则允许跨域
-    return request.headers.origin // Allow
+  if (localhostRegex.test(origin)) { // 判断是否为本地主机，如是则允许跨域
+    return origin // Allow
   } else if (config.CORS_ALLOW_ORIGIN) { // 如设置了安全域名则检查
     // 适配多条 CORS 规则
     // 以逗号分隔 CORS
@@ -188,45 +189,22 @@ function getAllowedOrigin (request) {
     // 遍历 CORS 列表
     for (let i = 0; i < corsList.length; i++) {
       const cors = corsList[i].replace(/\/$/, '') // 获取当前 CORS 并去除末尾的斜杠
-      if (cors === request.headers.origin) {
-        return request.headers.origin // Allow
+      if (cors === origin) {
+        return origin // Allow
       }
     }
     return '' // 不在安全域名列表中则禁止跨域
   } else {
-    return request.headers.origin // 未设置安全域名直接 Allow
+    return origin // 未设置安全域名直接 Allow
   }
 }
 
-function anonymousSignIn (request) {
-  if (request.body) {
-    if (request.body.accessToken) {
-      return request.body.accessToken
-    } else {
-      return uuidv4().replace(/-/g, '')
-    }
-  }
-}
-
-// A function for connecting to MongoDB,
-// taking a single parameter of the connection string
-async function connectToDatabase (uri) {
-  // If the database connection is cached,
-  // use it instead of creating a new connection
-  if (db) return db
-  if (!uri) throw new Error('未设置环境变量 MONGODB_URI')
-  // If no connection is cached, create a new one
-  logger.info('Connecting to database...')
-  const client = await MongoClient.connect(uri, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-  })
-  // Select the database through the connection,
-  // using the database path of the connection string
-  db = await client.db((new URL(uri)).pathname.substr(1))
-  // Cache the database connection and return the connection
-  logger.info('Connected to database')
-  return db
+function anonymousSignIn (event) {
+	if (event.accessToken) {
+		return event.accessToken
+	} else {
+		return uuidv4().replace(/-/g, '')
+	}
 }
 
 // 写入管理密码
@@ -260,6 +238,51 @@ async function login (password) {
   }
 }
 
+const commentCountQuery = env.DB.prepare(`
+SELECT COUNT(*) AS count FROM comment
+WHERE url = ?1 AND rid = "" AND (isSpam != ?2 OR uid = ?3)
+`.trim())
+
+// timestamp(2100/1/1) * 10
+const MAX_TIMESTAMP_MILLIS = 41025312000000
+const MAX_QUERY_LIMIT = 500
+
+const commentQuery = env.DB.prepare(`
+SELECT * FROM comment
+WHERE
+	url = ?1 AND
+	(isSpam != ?2 OR uid = ?3) AND
+	created < ?4 AND
+	top = ?5 AND
+	rid = ""
+ORDER BY created DESC
+LIMIT ?6
+`.trim())
+
+const replyQueryTemplate = `
+SELECT * FROM comment
+WHERE
+  url = ?1 AND
+	(isSpam != ?2 OR uid = ?3) AND
+	rid IN ({{RIDS}})
+`.trim()
+
+const replyQueryCache = new Map()
+
+function getReplyQuery (numParams) {
+	const cached = replyQueryCache.get(numParams)
+	if (cached) return cached
+	const result = env.DB.prepare(replyQueryTemplate.replace(
+		'{{RIDS}}',	new Array(numParams).fill('?').join(', ')))
+	replyQueryCache.set(numParams, result)
+	return result
+}
+
+function parseLike (comment) {
+	comment.like = JSON.parse(comment.like)
+	return comment
+}
+
 // 读取评论
 async function commentGet (event) {
   const res = {}
@@ -269,32 +292,19 @@ async function commentGet (event) {
     const isAdminUser = isAdmin()
     const limit = parseInt(config.COMMENT_PAGE_SIZE) || 8
     let more = false
-    let condition
-    let query
-    condition = {
-      url: { $in: getUrlQuery(event.url) },
-      rid: { $in: ['', null] }
-    }
-    // 查询非垃圾评论 + 自己的评论
-    query = getCommentQuery({ condition, uid, isAdminUser })
-    // 读取总条数
-    const count = await db
-      .collection('comment')
-      .countDocuments(query)
+    const count = await commentCountQuery
+			.bind(event.url, isAdminUser ? 2 : 1, uid)
+			.first('count')
     // 读取主楼
-    if (event.before) {
-      condition.created = { $lt: event.before }
-    }
     // 不包含置顶
-    condition.top = { $ne: true }
-    query = getCommentQuery({ condition, uid, isAdminUser })
-    let main = await db
-      .collection('comment')
-      .find(query)
-      .sort({ created: -1 })
-      // 流式分页，通过多读 1 条的方式，确认是否还有更多评论
-      .limit(limit + 1)
-      .toArray()
+    let { results: main } = await commentQuery
+			.bind(
+				event.url, isAdminUser ? 2 : 1, uid,
+				event.before ?? MAX_TIMESTAMP_MILLIS, 0,
+				// 流式分页，通过多读 1 条的方式，确认是否还有更多评论
+				limit + 1
+			).all()
+
     if (main.length > limit) {
       // 还有更多评论
       more = true
@@ -304,31 +314,23 @@ async function commentGet (event) {
     let top = []
     if (!config.TOP_DISABLED && !event.before) {
       // 查询置顶评论
-      query = {
-        ...condition,
-        top: true
-      }
-      top = await db
-        .collection('comment')
-        .find(query)
-        .sort({ created: -1 })
-        .toArray()
+      top = (await commentQuery
+				.bind(
+					event.url, isAdminUser ? 2 : 1, uid, MAX_TIMESTAMP_MILLIS, 1,
+					MAX_QUERY_LIMIT
+				).all()).results
       // 合并置顶评论和非置顶评论
       main = [
         ...top,
         ...main
       ]
     }
-    condition = {
-      rid: { $in: main.map((item) => item._id.toString()) }
-    }
-    query = getCommentQuery({ condition, uid, isAdminUser })
     // 读取回复楼
-    const reply = await db
-      .collection('comment')
-      .find(query)
-      .toArray()
-    res.data = parseComment([...main, ...reply], uid, config)
+    const { results: reply } = await getReplyQuery(main.length)
+			.bind(
+				event.url, isAdminUser ? 2 : 1, uid, ...main.map((item) => item._id)
+			).all()
+    res.data = parseComment([...main, ...reply].map(parseLike), uid, config)
     res.more = more
     res.count = count
   } catch (e) {
@@ -338,14 +340,33 @@ async function commentGet (event) {
   return res
 }
 
-function getCommentQuery ({ condition, uid, isAdminUser }) {
-  return {
-    $or: [
-      { ...condition, isSpam: { $ne: isAdminUser ? 'imaegoo' : true } },
-      { ...condition, uid }
-    ]
-  }
-}
+const commentForAdminCountQuery = env.DB.prepare(`
+SELECT COUNT(*) AS count FROM comment
+WHERE
+	isSpam != ?1 AND
+	(nick LIKE ?2 OR
+	 mail LIKE ?2 OR
+	 link LIKE ?2 OR
+	 ip LIKE ?2 OR
+	 comment LIKE ?2 OR
+	 url LIKE ?2 OR
+	 href LIKE ?2)
+`.trim())
+
+const commentForAdminQuery = env.DB.prepare(`
+SELECT * FROM comment
+WHERE
+	isSpam != ?1 AND
+	(nick LIKE ?2 OR
+	mail LIKE ?2 OR
+	link LIKE ?2 OR
+	ip LIKE ?2 OR
+	comment LIKE ?2 OR
+	url LIKE ?2 OR
+	href LIKE ?2)
+ORDER BY created DESC
+LIMIT ?3 OFFSET ?4
+`.trim())
 
 // 管理员读取评论
 async function commentGetForAdmin (event) {
@@ -353,16 +374,19 @@ async function commentGetForAdmin (event) {
   const isAdminUser = isAdmin()
   if (isAdminUser) {
     validate(event, ['per', 'page'])
-    const collection = db
-      .collection('comment')
-    const condition = getCommentSearchCondition(event)
-    const count = await collection.countDocuments(condition)
-    const data = await collection
-      .find(condition)
-      .sort({ created: -1 })
-      .skip(event.per * (event.page - 1))
-      .limit(event.per)
-      .toArray()
+    const count = await commentForAdminCountQuery
+			.bind(
+				event.type === 'VISIBLE' ? 1 :
+				event.type === 'HIDDEN' ? 0 :
+				2,
+				`%${event.keyword ?? ''}%`
+			).first('total')
+    const { results: data } = commentForAdminQuery.bind(
+			event.type === 'VISIBLE' ? 1 :
+			event.type === 'HIDDEN' ? 0 :
+			2,
+			`%${event.keyword ?? ''}%`
+		).all()
     res.code = RES_CODE.SUCCESS
     res.count = count
     res.data = parseCommentForAdmin(data)
@@ -373,36 +397,23 @@ async function commentGetForAdmin (event) {
   return res
 }
 
-function getCommentSearchCondition (event) {
-  let condition = {}
-  if (event.type) {
-    switch (event.type) {
-      case 'VISIBLE':
-        condition = { isSpam: { $ne: true } }
-        break
-      case 'HIDDEN':
-        condition = { isSpam: true }
-        break
-    }
-  }
-  if (event.keyword) {
-    const regExp = {
-      $regex: event.keyword,
-      $options: 'i'
-    }
-    condition = {
-      $or: [
-        { ...condition, nick: regExp },
-        { ...condition, mail: regExp },
-        { ...condition, link: regExp },
-        { ...condition, ip: regExp },
-        { ...condition, comment: regExp },
-        { ...condition, url: regExp },
-        { ...condition, href: regExp }
-      ]
-    }
-  }
-  return condition
+const commentSetStmtTemplate = `
+UPDATE comment
+SET {{FIELDS}}
+WHERE _id = ?1
+`.trim()
+
+const commentSetStmtCache = new Map()
+
+function getCommentSetStmt (fields) {
+	const cacheKey = JSON.stringify(fields)
+	const cached = commentSetStmtCache.get(cacheKey)
+	if (cached) return cached
+	const result = env.DB.prepare(commentSetStmtTemplate.replace(
+		'{{FIELDS}}', fields.map(field => `${field} = ?`).join(', ')
+	))
+	commentSetStmtCache.set(cacheKey, result)
+	return result
 }
 
 // 管理员修改评论
@@ -411,16 +422,11 @@ async function commentSetForAdmin (event) {
   const isAdminUser = isAdmin()
   if (isAdminUser) {
     validate(event, ['id', 'set'])
-    const data = await db
-      .collection('comment')
-      .updateOne({ _id: event.id }, {
-        $set: {
-          ...event.set,
-          updated: Date.now()
-        }
-      })
+		const fields = Object.keys(event.set).sort()
+    await getCommentSetStmt(fields).bind(
+			event.id, ...fields.map(field => event.set[field])
+		).run()
     res.code = RES_CODE.SUCCESS
-    res.updated = data
   } else {
     res.code = RES_CODE.NEED_LOGIN
     res.message = '请先登录'
@@ -428,17 +434,16 @@ async function commentSetForAdmin (event) {
   return res
 }
 
+const commentDeleteStmt = env.DB.prepare('DELETE FROM comment WHERE _id = ?1')
+
 // 管理员删除评论
 async function commentDeleteForAdmin (event) {
   const res = {}
   const isAdminUser = isAdmin()
   if (isAdminUser) {
     validate(event, ['id'])
-    const data = await db
-      .collection('comment')
-      .deleteOne({ _id: event.id })
+		await commentDeleteStmt.bind(event.id).run()
     res.code = RES_CODE.SUCCESS
-    res.deleted = data.deletedCount
   } else {
     res.code = RES_CODE.NEED_LOGIN
     res.message = '请先登录'
@@ -488,8 +493,9 @@ async function commentImportForAdmin (event) {
         default:
           throw new Error(`不支持 ${event.source} 的导入，请更新 Twikoo 云函数至最新版本`)
       }
-      const insertedCount = await bulkSaveComments(comments)
-      log(`导入成功 ${insertedCount} 条评论`)
+			// TODO: 考虑并行导入
+			for (const comment of comments) await save(comment)
+      log(`导入成功`)
     } catch (e) {
       log(e.message)
     }
@@ -503,15 +509,13 @@ async function commentImportForAdmin (event) {
   return res
 }
 
-async function commentExportForAdmin (event) {
+const commentExportQuery = env.DB.prepare('SELECT * FROM comment')
+
+async function commentExportForAdmin () {
   const res = {}
   const isAdminUser = isAdmin()
   if (isAdminUser) {
-    const collection = event.collection || 'comment'
-    const data = await db
-      .collection(collection)
-      .find({})
-      .toArray()
+    const { results: data } = await commentExportQuery.all()
     res.code = RES_CODE.SUCCESS
     res.data = data
   } else {
@@ -539,29 +543,22 @@ async function readFile (file, type, log) {
   }
 }
 
-// 批量导入评论
-async function bulkSaveComments (comments) {
-  const batchRes = await db
-    .collection('comment')
-    .insertMany(comments)
-  return batchRes.insertedCount
-}
-
 // 点赞 / 取消点赞
 async function commentLike (event) {
   const res = {}
   validate(event, ['id'])
-  res.updated = await like(event.id, getUid())
+  await like(event.id, getUid())
   return res
 }
 
+const commentByIdQuery = env.DB.prepare('SELECT * FROM comment WHERE _id = ?1')
+const updateLikeStmt = env.DB.prepare('UPDATE comment SET like = ?2 WHERE _id = ?1')
+
 // 点赞 / 取消点赞
 async function like (id, uid) {
-  const record = db
-    .collection('comment')
-  const comment = await record
-    .findOne({ _id: id })
-  let likes = comment && comment.like ? comment.like : []
+  const comment = await commentByIdQuery.bind(id).first()
+	if (!comment) return
+  let likes = JSON.parse(comment.like)
   if (likes.findIndex((item) => item === uid) === -1) {
     // 赞
     likes.push(uid)
@@ -569,10 +566,7 @@ async function like (id, uid) {
     // 取消赞
     likes = likes.filter((item) => item !== uid)
   }
-  const result = await record.updateOne({ _id: id }, {
-    $set: { like: likes }
-  })
-  return result
+	await updateLikeStmt.bind(id, JSON.stringify(likes))
 }
 
 /**
@@ -609,10 +603,11 @@ async function commentSubmit (event, request) {
     logger.log('开始异步垃圾检测、发送评论通知')
     logger.log('POST_SUBMIT')
     await Promise.race([
-      axios.post(`https://${process.env.VERCEL_URL}`, {
-        event: 'POST_SUBMIT',
-        comment
-      }, { headers: { 'x-twikoo-recursion': config.ADMIN_PASS || 'true' } }),
+			fetch('/', {
+				method: 'POST',
+				body: { event: 'POST_SUBMIT', comment },
+				headers: { 'x-twikoo-recursion': config.ADMIN_PASS || 'true' },
+			}),
       // 如果超过 5 秒还没收到异步返回，直接继续，减少用户等待的时间
       new Promise((resolve) => setTimeout(resolve, 5000))
     ])
@@ -623,20 +618,28 @@ async function commentSubmit (event, request) {
   return res
 }
 
+const saveCommentStmt = env.DB.prepare(`
+	INSERT INTO comment VALUES (
+		?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10,
+		?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20
+	)
+`.trim())
+
 // 保存评论
 async function save (data) {
-  await db
-    .collection('comment')
-    .insertOne(data)
-  data.id = data._id
-  return data
+	data.id = data._id = uuidv4().replace(/-/g, '')
+	await saveCommentStmt.bind(
+		data._id, data.uid, data.nick ?? '', data.mail ?? '', data.mailMd5 ?? '',
+		data.link ?? '', data.ua ?? '', data.ip ?? '', data.master ?? 0,
+		data.url, data.href, data.comment, data.pid ?? '', data.rid ?? '',
+		data.isSpam ?? 0, data.created, data.updated,
+		JSON.stringify(data.like ?? []), data.top ?? 0, data.avatar ?? ''
+	).run()
+	return data
 }
 
 async function getParentComment (currentComment) {
-  const parentComment = await db
-    .collection('comment')
-    .findOne({ _id: currentComment.pid })
-  return parentComment
+	return commentByIdQuery.bind(currentComment.pid).first()
 }
 
 // 异步垃圾检测、发送评论通知
@@ -668,7 +671,7 @@ async function parse (comment, request) {
     master: isBloggerMail,
     url: comment.url,
     href: comment.href,
-    comment: DOMPurify.sanitize(comment.comment, { FORBID_TAGS: ['style'], FORBID_ATTR: ['style'] }),
+    comment: comment.comment,
     pid: comment.pid ? comment.pid : comment.rid,
     rid: comment.rid,
     isSpam: isAdminUser ? false : preCheckSpam(comment, config),
@@ -683,35 +686,35 @@ async function parse (comment, request) {
   return commentDo
 }
 
+const commentCountSinceByIpQuery = env.DB.prepare(`
+SELECT COUNT(*) AS count FROM comment
+WHERE created > ?1 AND ip = ?2
+`.trim())
+
+const commentCountSinceQuery = env.DB.prepare(`
+SELECT COUNT(*) AS count FROM comment
+WHERE created > ?1
+`.trim())
+
 // 限流
 async function limitFilter (request) {
   // 限制每个 IP 每 10 分钟发表的评论数量
   let limitPerMinute = parseInt(config.LIMIT_PER_MINUTE)
   if (Number.isNaN(limitPerMinute)) limitPerMinute = 10
-  if (limitPerMinute) {
-    const count = await db
-      .collection('comment')
-      .countDocuments({
-        ip: getIp(request),
-        created: { $gt: Date.now() - 600000 }
-      })
-    if (count > limitPerMinute) {
-      throw new Error('发言频率过高')
-    }
-  }
   // 限制所有 IP 每 10 分钟发表的评论数量
   let limitPerMinuteAll = parseInt(config.LIMIT_PER_MINUTE_ALL)
   if (Number.isNaN(limitPerMinuteAll)) limitPerMinuteAll = 10
-  if (limitPerMinuteAll) {
-    const count = await db
-      .collection('comment')
-      .countDocuments({
-        created: { $gt: Date.now() - 600000 }
-      })
-    if (count > limitPerMinuteAll) {
-      throw new Error('评论太火爆啦 >_< 请稍后再试')
-    }
-  }
+
+	const getCountByIp = async () => limitPerMinute ?
+		commentCountSinceByIpQuery.bind(
+			Date.now() - 600000, getIp(request)
+		).first('count') : 0
+	const getCount = async () => limitPerMinuteAll ?
+		commentCountSinceQuery.bind(Date.now() - 600000).first('count') : 0
+	const [countByIp, count] = Promise.all([getCountByIp(), getCount()])
+
+  if (countByIp > limitPerMinute) throw new Error('发言频率过高')
+  if (count > limitPerMinuteAll) throw new Error('评论太火爆啦 >_< 请稍后再试')
 }
 
 async function checkCaptcha (comment, request) {
@@ -724,19 +727,22 @@ async function checkCaptcha (comment, request) {
   }
 }
 
+const updateIsSpamStmt = env.DB.prepare(`
+UPDATE comment SET isSpam = ?2, updated = ?3 WHERE _id = ?1
+`.trim())
+
 async function saveSpamCheckResult (comment, isSpam) {
   comment.isSpam = isSpam
-  if (isSpam) {
-    await db
-      .collection('comment')
-      .updateOne({ created: comment.created }, {
-        $set: {
-          isSpam,
-          updated: Date.now()
-        }
-      })
-  }
+	await updateIsSpamStmt.bind(comment._id, isSpam, Date.now()).run()
 }
+
+const incCounterStmt = env.DB.prepare(`
+INSERT INTO counter VALUES
+(?1, ?2, 1, ?3, ?3)
+ON CONFLICT (url) DO UPDATE SET time = time + 1, title = ?2, updated = ?3
+`.trim())
+
+const counterQuery = env.DB.prepare('SELECT time FROM counter WHERE url = ?1')
 
 /**
  * 获取文章点击量
@@ -746,10 +752,8 @@ async function counterGet (event) {
   const res = {}
   try {
     validate(event, ['url'])
-    const record = await readCounter(event.url)
-    res.data = record || {}
-    res.time = res.data ? res.data.time : 0
-    res.updated = await incCounter(event)
+		await incCounterStmt.bind(event.url, event.title, Date.now()).run()
+    res.time = await counterQuery.bind(event.url).first('time')
   } catch (e) {
     res.message = e.message
     return res
@@ -757,42 +761,10 @@ async function counterGet (event) {
   return res
 }
 
-// 读取阅读数
-async function readCounter (url) {
-  return await db
-    .collection('counter')
-    .findOne({ url })
-}
-
-/**
- * 更新阅读数
- * @param {String} event.url 文章地址
- * @param {String} event.title 文章标题
- */
-async function incCounter (event) {
-  let result
-  result = await db
-    .collection('counter')
-    .updateOne({ url: event.url }, {
-      $inc: { time: 1 },
-      $set: {
-        title: event.title,
-        updated: Date.now()
-      }
-    })
-  if (result.modifiedCount === 0) {
-    result = await db
-      .collection('counter')
-      .insertOne({
-        url: event.url,
-        title: event.title,
-        time: 1,
-        created: Date.now(),
-        updated: Date.now()
-      })
-  }
-  return result.modifiedCount || result.insertedCount
-}
+const commentCountByUrlQuery = env.DB.prepare(`
+SELECT COUNT(*) AS count FROM comment
+WHERE url = ?1 AND NOT isSpam AND (?2 OR rid = "")
+`.trim())
 
 /**
  * 批量获取文章评论数 API
@@ -803,33 +775,28 @@ async function getCommentsCount (event) {
   const res = {}
   try {
     validate(event, ['urls'])
-    const query = {}
-    query.isSpam = { $ne: true }
-    query.url = { $in: getUrlsQuery(event.urls) }
-    if (!event.includeReply) {
-      query.rid = { $in: ['', null] }
-    }
-    const result = await db
-      .collection('comment')
-      .aggregate([
-        { $match: query },
-        { $group: { _id: '$url', count: { $sum: 1 } } }
-      ])
-      .toArray()
-    res.data = []
-    for (const url of event.urls) {
-      const record = result.find((item) => item._id === url)
-      res.data.push({
-        url,
-        count: record ? record.count : 0
-      })
-    }
+		res.data = await Promise.all(event.urls.map(
+			async (url) => ({
+				url,
+				count: await commentCountByUrlQuery
+					.bind(url, event.includeReply)
+					.first("count"),
+			})))
   } catch (e) {
     res.message = e.message
     return res
   }
   return res
 }
+
+const recentCommentsByUrlQuery = env.DB.prepare(`
+SELECT * FROM comment
+WHERE
+	(?1 OR url = ?2) AND
+	NOT isSpam AND
+	(?3 OR rid = "") AND
+LIMIT ?4
+`)
 
 /**
  * 获取最新评论 API
@@ -838,19 +805,19 @@ async function getCommentsCount (event) {
 async function getRecentComments (event) {
   const res = {}
   try {
-    const query = {}
-    query.isSpam = { $ne: true }
-    if (event.urls && event.urls.length) {
-      query.url = { $in: getUrlsQuery(event.urls) }
-    }
-    if (!event.includeReply) query.rid = { $in: ['', null] }
-    if (event.pageSize > 100) event.pageSize = 100
-    const result = await db
-      .collection('comment')
-      .find(query)
-      .sort({ created: -1 })
-      .limit(event.pageSize || 10)
-      .toArray()
+		if (event.pageSize > 100) event.pageSize = 100
+		let result
+		if (event.urls && event.urls.length) {
+			result = await recentCommentsByUrlQuery.bind(
+				1, '', event.includeReply, event.pageSize || 10
+			).all()
+		} else {
+			result = (await Promise.all(event.urls.map(
+				(url) => recentCommentsByUrlQuery.bind(
+					0, url, event.includeReply, event.pageSize || 10
+				).all()
+			))).flat()
+		}
     res.data = result.map((comment) => {
       return {
         id: comment._id.toString(),
@@ -875,7 +842,7 @@ async function getRecentComments (event) {
 async function setConfig (event) {
   const isAdminUser = isAdmin()
   if (isAdminUser) {
-    writeConfig(event.config)
+    await writeConfig(event.config)
     return {
       code: RES_CODE.SUCCESS
     }
@@ -899,44 +866,25 @@ function protect (request) {
   }
 }
 
+const readConfigQuery = env.DB.prepare('SELECT value FROM config LIMIT 1')
+
 // 读取配置
 async function readConfig () {
-  try {
-    const res = await db
-      .collection('config')
-      .findOne({})
-    config = res || {}
-    return config
-  } catch (e) {
-    logger.error('读取配置失败：', e)
-    await createCollections()
-    config = {}
-    return config
-  }
+	const configStr = await readConfigQuery.first('value')
+	return config = configStr ? JSON.parse(configStr) : {}
 }
+
+const writeConfigStmt = env.DB.prepare('UPDATE config SET value = ?1')
 
 // 写入配置
 async function writeConfig (newConfig) {
-  if (!Object.keys(newConfig).length) return 0
+  if (!Object.keys(newConfig).length) return
   logger.info('写入配置：', newConfig)
   try {
-    let updated
-    let res = await db
-      .collection('config')
-      .updateOne({}, { $set: newConfig })
-    updated = res.modifiedCount
-    if (updated === 0) {
-      res = await db
-        .collection('config')
-        .insertOne(newConfig)
-      updated = res.id ? 1 : 0
-    }
-    // 更新后重置配置缓存
-    if (updated > 0) config = null
-    return updated
+		const config = { ...await readConfig(), ...newConfig }
+    await writeConfigStmt.bind(JSON.stringify(config))
   } catch (e) {
     logger.error('写入配置失败：', e)
-    return null
   }
 }
 
@@ -956,27 +904,6 @@ function isRecursion (request) {
   return request.headers['x-twikoo-recursion'] === (config.ADMIN_PASS || 'true')
 }
 
-// 建立数据库 collections
-async function createCollections () {
-  const collections = ['comment', 'config', 'counter']
-  const res = {}
-  for (const collection of collections) {
-    try {
-      res[collection] = await db.createCollection(collection)
-    } catch (e) {
-      logger.error('建立数据库失败：', e)
-    }
-  }
-  return res
-}
-
 function getIp (request) {
-  try {
-    const { TWIKOO_IP_HEADERS } = process.env
-    const headers = TWIKOO_IP_HEADERS ? JSON.parse(TWIKOO_IP_HEADERS) : []
-    return getUserIP(request, headers)
-  } catch (e) {
-    logger.error('获取 IP 错误信息：', e)
-  }
-  return getUserIP(request)
+	return request.headers.get('CF-Connecting-IP')
 }
