@@ -23,8 +23,8 @@ CREATE TABLE IF NOT EXISTS comment (
   PRIMARY KEY (url, created DESC)
 );
 
-CREATE INDEX idx_comment_created ON comment (created DESC)
-CREATE INDEX idx_comment_ip_created ON comment (ip, created DESC)
+CREATE INDEX idx_comment_created ON comment (created DESC);
+CREATE INDEX idx_comment_ip_created ON comment (ip, created DESC);
 
 DROP TABLE IF EXISTS config;
 CREATE TABLE IF NOT EXISTS config (

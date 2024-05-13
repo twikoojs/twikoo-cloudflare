@@ -9,7 +9,7 @@ import {
   $,
   md5,
   xml2js
-} from 'twikoo-func/utils/lib'
+} from 'twikoo-func-cloudflare-patch/utils/lib'
 import {
   getFuncVersion,
   parseComment,
@@ -27,7 +27,7 @@ import {
   getConfig,
   getConfigForAdmin,
   validate
-} from 'twikoo-func/utils'
+} from 'twikoo-func-cloudflare-patch/utils'
 import {
   jsonParse,
   commentImportValine,
@@ -35,14 +35,13 @@ import {
   commentImportArtalk,
   commentImportArtalk2,
   commentImportTwikoo
-} from 'twikoo-func/utils/import'
-import { postCheckSpam } from 'twikoo-func/utils/spam'
-import { sendNotice, emailTest } from 'twikoo-func/utils/notify'
-import { uploadImage } from 'twikoo-func/utils/image'
-import logger from 'twikoo-func/utils/logger'
+} from 'twikoo-func-cloudflare-patch/utils/import'
+import { postCheckSpam } from 'twikoo-func-cloudflare-patch/utils/spam'
+import { uploadImage } from 'twikoo-func-cloudflare-patch/utils/image'
+import logger from 'twikoo-func-cloudflare-patch/utils/logger'
 
 // 常量 / constants
-import constants from 'twikoo-func/utils/constants'
+import constants from 'twikoo-func-cloudflare-patch/utils/constants'
 
 const { RES_CODE, MAX_REQUEST_TIMES } = constants
 const VERSION = '1.6.32'
@@ -52,118 +51,121 @@ let config
 let accessToken
 const requestTimes = {}
 
-export default {
-  /**
-   * @param {Request} request
-   * @returns {Response}
-   */
-  async fetch(request) {
-    let event
-    try {
-      event = await request.json()
-    } catch {
-      event = {}
-    }
-    // logger.log('请求 IP：', getIp(request))
-    logger.log('请求函数：', event.event)
-    logger.log('请求参数：', event)
-    let res = {}
-    const headers = {}
-    try {
-      protect(request)
-      accessToken = anonymousSignIn(event)
-      await readConfig()
-      allowCors(request, headers)
-      if (request.method === 'OPTIONS') {
-        return new Response(null, { status: 204, headers })
-      }
-      switch (event.event) {
-        case 'GET_FUNC_VERSION':
-          res = getFuncVersion({ VERSION })
-          break
-        case 'COMMENT_GET':
-          res = await commentGet(event)
-          break
-        case 'COMMENT_GET_FOR_ADMIN':
-          res = await commentGetForAdmin(event)
-          break
-        case 'COMMENT_SET_FOR_ADMIN':
-          res = await commentSetForAdmin(event)
-          break
-        case 'COMMENT_DELETE_FOR_ADMIN':
-          res = await commentDeleteForAdmin(event)
-          break
-        case 'COMMENT_IMPORT_FOR_ADMIN':
-          res = await commentImportForAdmin(event)
-          break
-        case 'COMMENT_LIKE':
-          res = await commentLike(event)
-          break
-        case 'COMMENT_SUBMIT':
-          res = await commentSubmit(event, request)
-          break
-        case 'POST_SUBMIT':
-          res = await postSubmit(event.comment, request)
-          break
-        case 'COUNTER_GET':
-          res = await counterGet(event)
-          break
-        case 'GET_PASSWORD_STATUS':
-          res = await getPasswordStatus(config, VERSION)
-          break
-        case 'SET_PASSWORD':
-          res = await setPassword(event)
-          break
-        case 'GET_CONFIG':
-          res = await getConfig({ config, VERSION, isAdmin: isAdmin() })
-          break
-        case 'GET_CONFIG_FOR_ADMIN':
-          res = await getConfigForAdmin({ config, isAdmin: isAdmin() })
-          break
-        case 'SET_CONFIG':
-          res = await setConfig(event)
-          break
-        case 'LOGIN':
-          res = await login(event.password)
-          break
-        case 'GET_COMMENTS_COUNT': // >= 0.2.7
-          res = await getCommentsCount(event)
-          break
-        case 'GET_RECENT_COMMENTS': // >= 0.2.7
-          res = await getRecentComments(event)
-          break
-        case 'EMAIL_TEST': // >= 1.4.6
-          res = await emailTest(event, config, isAdmin())
-          break
-        case 'UPLOAD_IMAGE': // >= 1.5.0
-          res = await uploadImage(event, config)
-          break
-        case 'COMMENT_EXPORT_FOR_ADMIN': // >= 1.6.13
-          res = await commentExportForAdmin(event)
-          break
-        default:
-          if (event.event) {
-            res.code = RES_CODE.EVENT_NOT_EXIST
-            res.message = '请更新 Twikoo 云函数至最新版本'
-          } else {
-            res.code = RES_CODE.NO_PARAM
-            res.message = 'Twikoo 云函数运行正常，请参考 https://twikoo.js.org/frontend.html 完成前端的配置'
-            res.version = VERSION
-          }
-      }
-    } catch (e) {
-      logger.error('Twikoo 遇到错误，请参考以下错误信息。如有疑问，请反馈至 https://github.com/twikoojs/twikoo/issues')
-      logger.error('请求参数：', event)
-      logger.error('错误信息：', e)
-      res.code = RES_CODE.FAIL
-      res.message = e.message
-    }
-    if (!res.code && !request.body.accessToken) {
-      res.accessToken = accessToken
-    }
-    logger.log('请求返回：', res)
-    response.status(200).json(res)
+addEventListener('fetch', event => {
+  event.respondWith(handleRequest(event.request))
+})
+
+/**
+ * @param {Request} request
+ * @returns {Response}
+ */
+async function handleRequest (request) {
+  let event
+  try {
+    event = await request.json()
+  } catch {
+    event = {}
   }
+  // logger.log('请求 IP：', getIp(request))
+  logger.log('请求函数：', event.event)
+  logger.log('请求参数：', event)
+  let res = {}
+  const headers = {}
+  try {
+    protect(request)
+    accessToken = anonymousSignIn(event)
+    await readConfig()
+    allowCors(request, headers)
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { status: 204, headers })
+    }
+    switch (event.event) {
+      case 'GET_FUNC_VERSION':
+        res = getFuncVersion({ VERSION })
+        break
+      case 'COMMENT_GET':
+        res = await commentGet(event)
+        break
+      case 'COMMENT_GET_FOR_ADMIN':
+        res = await commentGetForAdmin(event)
+        break
+      case 'COMMENT_SET_FOR_ADMIN':
+        res = await commentSetForAdmin(event)
+        break
+      case 'COMMENT_DELETE_FOR_ADMIN':
+        res = await commentDeleteForAdmin(event)
+        break
+      case 'COMMENT_IMPORT_FOR_ADMIN':
+        res = await commentImportForAdmin(event)
+        break
+      case 'COMMENT_LIKE':
+        res = await commentLike(event)
+        break
+      case 'COMMENT_SUBMIT':
+        res = await commentSubmit(event, request)
+        break
+      case 'POST_SUBMIT':
+        res = await postSubmit(event.comment, request)
+        break
+      case 'COUNTER_GET':
+        res = await counterGet(event)
+        break
+      case 'GET_PASSWORD_STATUS':
+        res = await getPasswordStatus(config, VERSION)
+        break
+      case 'SET_PASSWORD':
+        res = await setPassword(event)
+        break
+      case 'GET_CONFIG':
+        res = await getConfig({ config, VERSION, isAdmin: isAdmin() })
+        break
+      case 'GET_CONFIG_FOR_ADMIN':
+        res = await getConfigForAdmin({ config, isAdmin: isAdmin() })
+        break
+      case 'SET_CONFIG':
+        res = await setConfig(event)
+        break
+      case 'LOGIN':
+        res = await login(event.password)
+        break
+      case 'GET_COMMENTS_COUNT': // >= 0.2.7
+        res = await getCommentsCount(event)
+        break
+      case 'GET_RECENT_COMMENTS': // >= 0.2.7
+        res = await getRecentComments(event)
+        break
+      case 'EMAIL_TEST': // >= 1.4.6
+        res.code = RES_CODE.FAIL
+        res.message = 'Not supported'
+        break
+      case 'UPLOAD_IMAGE': // >= 1.5.0
+        res = await uploadImage(event, config)
+        break
+      case 'COMMENT_EXPORT_FOR_ADMIN': // >= 1.6.13
+        res = await commentExportForAdmin(event)
+        break
+      default:
+        if (event.event) {
+          res.code = RES_CODE.EVENT_NOT_EXIST
+          res.message = '请更新 Twikoo 云函数至最新版本'
+        } else {
+          res.code = RES_CODE.NO_PARAM
+          res.message = 'Twikoo 云函数运行正常，请参考 https://twikoo.js.org/frontend.html 完成前端的配置'
+          res.version = VERSION
+        }
+    }
+  } catch (e) {
+    logger.error('Twikoo 遇到错误，请参考以下错误信息。如有疑问，请反馈至 https://github.com/twikoojs/twikoo/issues')
+    logger.error('请求参数：', event)
+    logger.error('错误信息：', e)
+    res.code = RES_CODE.FAIL
+    res.message = e.message
+  }
+  if (!res.code && !request.body.accessToken) {
+    res.accessToken = accessToken
+  }
+  logger.log('请求返回：', res)
+  response.status(200).json(res)
 }
 
 function allowCors (request, headers) {
@@ -238,7 +240,7 @@ async function login (password) {
   }
 }
 
-const commentCountQuery = env.DB.prepare(`
+const commentCountQuery = DB.prepare(`
 SELECT COUNT(*) AS count FROM comment
 WHERE url = ?1 AND rid = "" AND (isSpam != ?2 OR uid = ?3)
 `.trim())
@@ -247,7 +249,7 @@ WHERE url = ?1 AND rid = "" AND (isSpam != ?2 OR uid = ?3)
 const MAX_TIMESTAMP_MILLIS = 41025312000000
 const MAX_QUERY_LIMIT = 500
 
-const commentQuery = env.DB.prepare(`
+const commentQuery = DB.prepare(`
 SELECT * FROM comment
 WHERE
   url = ?1 AND
@@ -272,7 +274,7 @@ const replyQueryCache = new Map()
 function getReplyQuery (numParams) {
   const cached = replyQueryCache.get(numParams)
   if (cached) return cached
-  const result = env.DB.prepare(replyQueryTemplate.replace(
+  const result = DB.prepare(replyQueryTemplate.replace(
     '{{RIDS}}',	new Array(numParams).fill('?').join(', ')))
   replyQueryCache.set(numParams, result)
   return result
@@ -340,7 +342,7 @@ async function commentGet (event) {
   return res
 }
 
-const commentForAdminCountQuery = env.DB.prepare(`
+const commentForAdminCountQuery = DB.prepare(`
 SELECT COUNT(*) AS count FROM comment
 WHERE
   isSpam != ?1 AND
@@ -353,7 +355,7 @@ WHERE
    href LIKE ?2)
 `.trim())
 
-const commentForAdminQuery = env.DB.prepare(`
+const commentForAdminQuery = DB.prepare(`
 SELECT * FROM comment
 WHERE
   isSpam != ?1 AND
@@ -409,7 +411,7 @@ function getCommentSetStmt (fields) {
   const cacheKey = JSON.stringify(fields)
   const cached = commentSetStmtCache.get(cacheKey)
   if (cached) return cached
-  const result = env.DB.prepare(commentSetStmtTemplate.replace(
+  const result = DB.prepare(commentSetStmtTemplate.replace(
     '{{FIELDS}}', fields.map(field => `${field} = ?`).join(', ')
   ))
   commentSetStmtCache.set(cacheKey, result)
@@ -434,7 +436,7 @@ async function commentSetForAdmin (event) {
   return res
 }
 
-const commentDeleteStmt = env.DB.prepare('DELETE FROM comment WHERE _id = ?1')
+const commentDeleteStmt = DB.prepare('DELETE FROM comment WHERE _id = ?1')
 
 // 管理员删除评论
 async function commentDeleteForAdmin (event) {
@@ -509,7 +511,7 @@ async function commentImportForAdmin (event) {
   return res
 }
 
-const commentExportQuery = env.DB.prepare('SELECT * FROM comment')
+const commentExportQuery = DB.prepare('SELECT * FROM comment')
 
 async function commentExportForAdmin () {
   const res = {}
@@ -551,8 +553,8 @@ async function commentLike (event) {
   return res
 }
 
-const commentByIdQuery = env.DB.prepare('SELECT * FROM comment WHERE _id = ?1')
-const updateLikeStmt = env.DB.prepare('UPDATE comment SET like = ?2 WHERE _id = ?1')
+const commentByIdQuery = DB.prepare('SELECT * FROM comment WHERE _id = ?1')
+const updateLikeStmt = DB.prepare('UPDATE comment SET like = ?2 WHERE _id = ?1')
 
 // 点赞 / 取消点赞
 async function like (id, uid) {
@@ -618,7 +620,7 @@ async function commentSubmit (event, request) {
   return res
 }
 
-const saveCommentStmt = env.DB.prepare(`
+const saveCommentStmt = DB.prepare(`
   INSERT INTO comment VALUES (
     ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10,
     ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20
@@ -638,18 +640,14 @@ async function save (data) {
   return data
 }
 
-async function getParentComment (currentComment) {
-  return commentByIdQuery.bind(currentComment.pid).first()
-}
-
 // 异步垃圾检测、发送评论通知
 async function postSubmit (comment, request) {
   if (!isRecursion(request)) return { code: RES_CODE.FORBIDDEN }
   // 垃圾检测
   const isSpam = await postCheckSpam(comment, config)
   await saveSpamCheckResult(comment, isSpam)
-  // 发送通知
-  await sendNotice(comment, config, getParentComment)
+  // 发送通知 (nodemailer与Cloudflare不兼容，暂时跳过)
+  // await sendNotice(comment, config, getParentComment)
   return { code: RES_CODE.SUCCESS }
 }
 
@@ -686,12 +684,12 @@ async function parse (comment, request) {
   return commentDo
 }
 
-const commentCountSinceByIpQuery = env.DB.prepare(`
+const commentCountSinceByIpQuery = DB.prepare(`
 SELECT COUNT(*) AS count FROM comment
 WHERE created > ?1 AND ip = ?2
 `.trim())
 
-const commentCountSinceQuery = env.DB.prepare(`
+const commentCountSinceQuery = DB.prepare(`
 SELECT COUNT(*) AS count FROM comment
 WHERE created > ?1
 `.trim())
@@ -727,7 +725,7 @@ async function checkCaptcha (comment, request) {
   }
 }
 
-const updateIsSpamStmt = env.DB.prepare(`
+const updateIsSpamStmt = DB.prepare(`
 UPDATE comment SET isSpam = ?2, updated = ?3 WHERE _id = ?1
 `.trim())
 
@@ -736,13 +734,13 @@ async function saveSpamCheckResult (comment, isSpam) {
   await updateIsSpamStmt.bind(comment._id, isSpam, Date.now()).run()
 }
 
-const incCounterStmt = env.DB.prepare(`
+const incCounterStmt = DB.prepare(`
 INSERT INTO counter VALUES
 (?1, ?2, 1, ?3, ?3)
 ON CONFLICT (url) DO UPDATE SET time = time + 1, title = ?2, updated = ?3
 `.trim())
 
-const counterQuery = env.DB.prepare('SELECT time FROM counter WHERE url = ?1')
+const counterQuery = DB.prepare('SELECT time FROM counter WHERE url = ?1')
 
 /**
  * 获取文章点击量
@@ -761,7 +759,7 @@ async function counterGet (event) {
   return res
 }
 
-const commentCountByUrlQuery = env.DB.prepare(`
+const commentCountByUrlQuery = DB.prepare(`
 SELECT COUNT(*) AS count FROM comment
 WHERE url = ?1 AND NOT isSpam AND (?2 OR rid = "")
 `.trim())
@@ -789,7 +787,7 @@ async function getCommentsCount (event) {
   return res
 }
 
-const recentCommentsByUrlQuery = env.DB.prepare(`
+const recentCommentsByUrlQuery = DB.prepare(`
 SELECT * FROM comment
 WHERE
   (?1 OR url = ?2) AND
@@ -866,7 +864,7 @@ function protect (request) {
   }
 }
 
-const readConfigQuery = env.DB.prepare('SELECT value FROM config LIMIT 1')
+const readConfigQuery = DB.prepare('SELECT value FROM config LIMIT 1')
 
 // 读取配置
 async function readConfig () {
@@ -874,7 +872,7 @@ async function readConfig () {
   return config = configStr ? JSON.parse(configStr) : {}
 }
 
-const writeConfigStmt = env.DB.prepare('UPDATE config SET value = ?1')
+const writeConfigStmt = DB.prepare('UPDATE config SET value = ?1')
 
 // 写入配置
 async function writeConfig (newConfig) {
