@@ -12,3 +12,6 @@ database_id = "218baf47-5600-4e70-b5bf-79dffbac9680"
 
 [vars]
 IS_CLOUDFLARE_WORKER = "true"
+
+[dev]
+port = 5000
