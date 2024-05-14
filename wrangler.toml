@@ -7,7 +7,7 @@ node_compat = true
 
 [[d1_databases]]
 binding = "DB" # available in your Worker on env.DB
-database_name = "comment"
+database_name = "twikoo"
 database_id = "218baf47-5600-4e70-b5bf-79dffbac9680"
 
 [vars]

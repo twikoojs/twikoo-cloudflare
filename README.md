@@ -40,8 +40,7 @@ Because Cloudflare workers are only [partially compatible](https://developers.cl
 1. Environment variables (`process.env.XXX`) can't be used to control the behavior of the app.
 2. Tencent Cloud can't be integrated.
 3. Can't find the location based on ip address (compatibility issue of the `@imaegoo/node-ip2region` package).
-4. Can't send email notifications after comments are posted (compatibility issue of the `nodemailer` package).
-5. Package `dompurify` can't be used to sanitize the comments due to compatibility issue of `jsdom` package. Instead, we're using [`xss`](https://www.npmjs.com/package/xss) package for XSS sanitization.
-6. In this deployment, we don't normalize URL path between `/some/path/` and `/some/path`. This is because it's not easy to write a Cloudflare D1 SQL query to unify these 2 kinds of paths. If your website can have paths with and without the trailing `/` for the same page, you can explicitly set the `path` field in `twikoo.init`.
+4. Package `dompurify` can't be used to sanitize the comments due to compatibility issue of `jsdom` package. Instead, we're using [`xss`](https://www.npmjs.com/package/xss) package for XSS sanitization.
+5. In this deployment, we don't normalize URL path between `/some/path/` and `/some/path`. This is because it's not easy to write a Cloudflare D1 SQL query to unify these 2 kinds of paths. If your website can have paths with and without the trailing `/` for the same page, you can explicitly set the `path` field in `twikoo.init`.
 
 If you encounter any issues, or have any questions for this deployment, you can send an email to tao@vanjs.org.
