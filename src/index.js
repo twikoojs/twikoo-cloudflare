@@ -1,15 +1,16 @@
 /*!
  * Twikoo Cloudflare worker
- * (c) 2024-present iMaeGoo
+ * (c) 2024-present Tao Xin & iMaeGoo
  * Released under the MIT License.
  */
 
 import { v4 as uuidv4 } from 'uuid' // 用户 id 生成
+import xss from 'xss'
 import {
-  $,
-  md5,
-  xml2js
-} from 'twikoo-func-cloudflare-patch/utils/lib'
+  getCheerio,
+  getMd5,
+  getXml2js
+} from 'twikoo-func/utils/lib'
 import {
   getFuncVersion,
   parseComment,
@@ -27,7 +28,7 @@ import {
   getConfig,
   getConfigForAdmin,
   validate
-} from 'twikoo-func-cloudflare-patch/utils'
+} from 'twikoo-func/utils'
 import {
   jsonParse,
   commentImportValine,
@@ -35,16 +36,17 @@ import {
   commentImportArtalk,
   commentImportArtalk2,
   commentImportTwikoo
-} from 'twikoo-func-cloudflare-patch/utils/import'
-import { postCheckSpam } from 'twikoo-func-cloudflare-patch/utils/spam'
-import { uploadImage } from 'twikoo-func-cloudflare-patch/utils/image'
-import logger from 'twikoo-func-cloudflare-patch/utils/logger'
-import { getDomPurify } from 'twikoo-func-cloudflare-patch/utils/dom'
+} from 'twikoo-func/utils/import'
+import { postCheckSpam } from 'twikoo-func/utils/spam'
+import { uploadImage } from 'twikoo-func/utils/image'
+import logger from 'twikoo-func/utils/logger'
 
 // 常量 / constants
-import constants from 'twikoo-func-cloudflare-patch/utils/constants'
+import constants from 'twikoo-func/utils/constants'
 
-const DOMPurify = getDomPurify()
+const $ = getCheerio()
+const md5 = getMd5()
+const xml2js = getXml2js()
 
 const { RES_CODE, MAX_REQUEST_TIMES } = constants
 const VERSION = '1.6.33'
@@ -784,7 +786,7 @@ async function parse (comment, request) {
     master: isBloggerMail,
     url: comment.url,
     href: comment.href,
-    comment: DOMPurify.sanitize(comment.comment, { FORBID_TAGS: ['style'], FORBID_ATTR: ['style'] }),
+    comment: xss(comment.comment),
     pid: comment.pid ? comment.pid : comment.rid,
     rid: comment.rid,
     isSpam: isAdminUser ? false : preCheckSpam(comment, config),

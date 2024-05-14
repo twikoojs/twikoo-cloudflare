@@ -11,7 +11,7 @@ This is the twikoo deployment on Cloudflare workers. Compared to other deploymen
 2. Because the free tier of Cloudflare workers has a strict 1MiB limit on the bundle size, we need to manually delete some packages to keep the bundle within the limit. These packages can't be used anyway due to the Node.js [compatibility issues](#known-limitations) of Cloudflare workers.
   ```shell
   rm -rf node_modules/tencentcloud-sdk-nodejs
-  rm -rf rm -rf node_modules/jsdom
+  rm -rf node_modules/jsdom
   ```
 3. Login to your Cloudflare account:
   ```shell
@@ -19,18 +19,19 @@ This is the twikoo deployment on Cloudflare workers. Compared to other deploymen
   ```
 3. Create the Cloudflare D1 database and set up the schema:
   ```shell
-  npx wrangler d1 create comment
-  npx wrangler d1 execute d1 --remote --file=./schema.sql
+  npx wrangler d1 create twikoo
+  npx wrangler d1 execute twikoo --remote --file=./schema.sql
   ```
-4. Deploy the Cloudflare worker:
+4. Copy 2 lines of "database_name" and "database_id" from the output of the previous step, and paste them into `wrangler.toml` file, overwrite the original values.
+5. Deploy the Cloudflare worker:
   ```shell
   npx wrangler deploy --minify
   ```
-5. If everything works smoothly, you will see something like: `https://twikoo-cloudflare.<your user name>.workers.dev` in the commandline. You can visit the address. If everything is set up perfectly, you're expected to see a line like that in your browser:
+6. If everything works smoothly, you will see something like: `https://twikoo-cloudflare.<your user name>.workers.dev` in the commandline. You can visit the address. If everything is set up perfectly, you're expected to see a line like that in your browser:
   ```
   {"code":100,"message":"Twikoo 云函数运行正常，请参考 https://twikoo.js.org/frontend.html 完成前端的配置","version":"1.6.33"}
   ```
-6. When you set up the front end, the address in step 5 (including the `https://` prefix) should be used as the `envId` field in `twikoo.init`.
+7. When you set up the front end, the address in step 6 (including the `https://` prefix) should be used as the `envId` field in `twikoo.init`.
 
 ## Known limitations
 
