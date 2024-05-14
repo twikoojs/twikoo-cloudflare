@@ -11,7 +11,7 @@ This is the twikoo deployment on Cloudflare workers. Compared to other deploymen
 2. Because the free tier of Cloudflare workers has a strict 1MiB limit on the bundle size, we need to manually delete some packages to keep the bundle within the limit. These packages can't be used anyway due to the Node.js [compatibility issues](#known-limitations) of Cloudflare workers.
   ```shell
   rm -rf node_modules/tencentcloud-sdk-nodejs
-  rm -rf rm -rf node_modules/jsdom
+  rm -rf node_modules/jsdom
   ```
 3. Login to your Cloudflare account:
   ```shell

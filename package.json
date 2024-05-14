@@ -8,18 +8,16 @@
   "scripts": {
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
-    "start": "wrangler dev",
-    "test": "vitest"
+    "start": "wrangler dev"
   },
   "homepage": "https://twikoo.js.org",
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.1.0",
-    "vitest": "1.3.0",
     "wrangler": "^3.55.0"
   },
   "dependencies": {
-    "twikoo-func-cloudflare-patch": "1.6.33-rc.12",
+    "twikoo-func": "1.6.34",
     "url": "^0.11.3",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "xss": "^1.0.15"
   }
 }
