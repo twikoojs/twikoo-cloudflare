@@ -49,7 +49,7 @@ const md5 = getMd5()
 const xml2js = getXml2js()
 
 const { RES_CODE, MAX_REQUEST_TIMES } = constants
-const VERSION = '1.6.33'
+const VERSION = '1.6.34'
 
 // 全局变量 / variables
 let config
@@ -310,9 +310,6 @@ export default {
           break
         case 'COMMENT_SUBMIT':
           res = await commentSubmit(event, request)
-          break
-        case 'POST_SUBMIT':
-          res = await postSubmit(event.comment, request)
           break
         case 'COUNTER_GET':
           res = await counterGet(event)
@@ -726,14 +723,16 @@ async function commentSubmit (event, request) {
     logger.log('开始异步垃圾检测、发送评论通知')
     logger.log('POST_SUBMIT')
 
-    const url = new URL(request.url)
-    url.pathname = '/'
     await Promise.race([
-      fetch(url.toString(), {
-        method: 'POST',
-        body: { event: 'POST_SUBMIT', comment },
-        headers: { 'x-twikoo-recursion': config.ADMIN_PASS || 'true' },
-      }),
+      (async () => {
+        try {
+          await postSubmit(comment)
+        } catch (e) {
+          logger.error('POST_SUBMIT 遇到错误')
+          logger.error('请求参数：', comment)
+          logger.error('错误信息：', e)
+        }
+      })(),
       // 如果超过 5 秒还没收到异步返回，直接继续，减少用户等待的时间
       new Promise((resolve) => setTimeout(resolve, 5000))
     ])
@@ -758,10 +757,9 @@ async function save (data) {
 }
 
 // 异步垃圾检测、发送评论通知
-async function postSubmit (comment, request) {
-  if (!isRecursion(request)) return { code: RES_CODE.FORBIDDEN }
+async function postSubmit (comment) {
   // 垃圾检测
-  const isSpam = await postCheckSpam(comment, config)
+  const isSpam = await postCheckSpam(comment, config) ?? false
   await saveSpamCheckResult(comment, isSpam)
   // 发送通知 (nodemailer与Cloudflare不兼容，暂时跳过)
   // await sendNotice(comment, config, getParentComment)
@@ -972,11 +970,6 @@ function getUid () {
 function isAdmin () {
   const uid = getUid()
   return config.ADMIN_PASS === md5(uid)
-}
-
-// 判断是否为递归调用（即云函数调用自身）
-function isRecursion (request) {
-  return request.headers['x-twikoo-recursion'] === (config.ADMIN_PASS || 'true')
 }
 
 function getIp (request) {
