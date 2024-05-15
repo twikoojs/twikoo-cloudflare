@@ -535,7 +535,7 @@ async function commentGetForAdmin (event) {
     ).all()
     res.code = RES_CODE.SUCCESS
     res.count = count
-    res.data = parseCommentForAdmin(data)
+    res.data = data
   } else {
     res.code = RES_CODE.NEED_LOGIN
     res.message = '请先登录'
