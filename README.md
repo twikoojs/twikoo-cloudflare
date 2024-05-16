@@ -12,6 +12,7 @@ This is the twikoo deployment on Cloudflare workers. Compared to other deploymen
   ```shell
   echo "" > node_modules/jsdom/lib/api.js
   echo "" > node_modules/tencentcloud-sdk-nodejs/tencentcloud/index.js
+  echo "" > node_modules/nodemailer/lib/nodemailer.js
   ```
 3. Login to your Cloudflare account:
   ```shell
@@ -42,5 +43,19 @@ Because Cloudflare workers are only [partially compatible](https://developers.cl
 3. Can't find the location based on ip address (compatibility issue of the `@imaegoo/node-ip2region` package).
 4. Package `dompurify` can't be used to sanitize the comments due to compatibility issue of `jsdom` package. Instead, we're using [`xss`](https://www.npmjs.com/package/xss) package for XSS sanitization.
 5. In this deployment, we don't normalize URL path between `/some/path/` and `/some/path`. This is because it's not easy to write a Cloudflare D1 SQL query to unify these 2 kinds of paths. If your website can have paths with and without the trailing `/` for the same page, you can explicitly set the `path` field in `twikoo.init`.
+
+## Configure for email notifications
+
+Because of the compatibility issues of `nodemailer` package, the email integration via SMTP for sending notifications won't work directly. Instead, in this worker, we support email notifications via SendGrid's HTTPS API. To enable the email integration via SendGrid, you can follow the steps below:
+1. Ensure you have a usable SendGrid account (SendGrid offers a free-tier for sending up to 100 emails per day), and create an API key.
+2. Set the following fields in the config:
+  * `SENDER_EMAIL`: The email address of the sender. Needs to verify it in SendGrid.
+  * `SENDER_NAME`: The name shown as the sender.
+  * `SMTP_SERVICE`: SendGrid.
+  * `SMTP_USER`: Provide some non-empty value.
+  * `SMTP_PASS`: The API key.
+3. Optionally, you can set other config values to customize how the notification emails look like.
+4. In the configuration page, click `Send test email` button to make sure the integration works well.
+5. In your email provider, make sure the incoming emails aren't classified as spam.
 
 If you encounter any issues, or have any questions for this deployment, you can send an email to tao@vanjs.org.

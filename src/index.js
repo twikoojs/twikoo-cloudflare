@@ -9,12 +9,12 @@ import xss from 'xss'
 import {
   getCheerio,
   getMd5,
-  getXml2js
-} from 'twikoo-func/utils/lib'
+  getXml2js,
+  setCustomLibs
+} from 'twikoo-func-cloudflare-patch/utils/lib'
 import {
   getFuncVersion,
   parseComment,
-  parseCommentForAdmin,
   normalizeMail,
   equalsMail,
   getMailMd5,
@@ -28,7 +28,7 @@ import {
   getConfig,
   getConfigForAdmin,
   validate
-} from 'twikoo-func/utils'
+} from 'twikoo-func-cloudflare-patch/utils'
 import {
   jsonParse,
   commentImportValine,
@@ -36,13 +36,50 @@ import {
   commentImportArtalk,
   commentImportArtalk2,
   commentImportTwikoo
-} from 'twikoo-func/utils/import'
-import { postCheckSpam } from 'twikoo-func/utils/spam'
-import { uploadImage } from 'twikoo-func/utils/image'
-import logger from 'twikoo-func/utils/logger'
+} from 'twikoo-func-cloudflare-patch/utils/import'
+import { postCheckSpam } from 'twikoo-func-cloudflare-patch/utils/spam'
+import { sendNotice, emailTest } from 'twikoo-func-cloudflare-patch/utils/notify'
+import { uploadImage } from 'twikoo-func-cloudflare-patch/utils/image'
+import logger from 'twikoo-func-cloudflare-patch/utils/logger'
 
 // 常量 / constants
-import constants from 'twikoo-func/utils/constants'
+import constants from 'twikoo-func-cloudflare-patch/utils/constants'
+
+// 注入Cloudflare特定的依赖（原依赖于Cloudflare不兼容）
+setCustomLibs({
+  DOMPurify: {
+    sanitize (input) {
+      return input
+    }
+  },
+
+  nodemailer: {
+    createTransport () {
+      return {
+        verify () {
+          return true
+        },
+
+        sendMail ({ from, to, subject, html }) {
+          if (!config.SMTP_PASS) return "未配置SMTP_PASS，跳过邮件通知。"
+          return fetch('https://api.sendgrid.com/v3/mail/send', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${config.SMTP_PASS}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              personalizations: [{ to: [{ email: to }] }],
+              from: { email: from },
+              subject,
+              content: [{ type: 'text/html', value: html }],
+            })
+          })
+        }
+      }
+    }
+  }
+})
 
 const $ = getCheerio()
 const md5 = getMd5()
@@ -339,9 +376,8 @@ export default {
           res = await getRecentComments(event)
           break
         case 'EMAIL_TEST': // >= 1.4.6
-          res.code = RES_CODE.FAIL
-          res.message = 'Not supported'
-          break
+          res = await emailTest(event, config, isAdmin())
+        break
         case 'UPLOAD_IMAGE': // >= 1.5.0
           res = await uploadImage(event, config)
           break
@@ -756,13 +792,17 @@ async function save (data) {
   return data
 }
 
+async function getParentComment (currentComment) {
+	return db.commentByIdQuery.bind(currentComment.pid).first()
+}
+
 // 异步垃圾检测、发送评论通知
 async function postSubmit (comment) {
   // 垃圾检测
   const isSpam = await postCheckSpam(comment, config) ?? false
   await saveSpamCheckResult(comment, isSpam)
-  // 发送通知 (nodemailer与Cloudflare不兼容，暂时跳过)
-  // await sendNotice(comment, config, getParentComment)
+  // 发送通知
+  await sendNotice(comment, config, getParentComment)
   return { code: RES_CODE.SUCCESS }
 }
 
