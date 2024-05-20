@@ -15,7 +15,7 @@
     "wrangler": "^3.55.0"
   },
   "dependencies": {
-    "twikoo-func-cloudflare-patch": "1.6.35-rc.1",
+    "twikoo-func": "^1.6.35",
     "url": "^0.11.3",
     "uuid": "^9.0.1",
     "xss": "^1.0.15"

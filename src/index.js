@@ -11,7 +11,7 @@ import {
   getMd5,
   getXml2js,
   setCustomLibs
-} from 'twikoo-func-cloudflare-patch/utils/lib'
+} from 'twikoo-func/utils/lib'
 import {
   getFuncVersion,
   parseComment,
@@ -28,7 +28,7 @@ import {
   getConfig,
   getConfigForAdmin,
   validate
-} from 'twikoo-func-cloudflare-patch/utils'
+} from 'twikoo-func/utils'
 import {
   jsonParse,
   commentImportValine,
@@ -36,14 +36,14 @@ import {
   commentImportArtalk,
   commentImportArtalk2,
   commentImportTwikoo
-} from 'twikoo-func-cloudflare-patch/utils/import'
-import { postCheckSpam } from 'twikoo-func-cloudflare-patch/utils/spam'
-import { sendNotice, emailTest } from 'twikoo-func-cloudflare-patch/utils/notify'
-import { uploadImage } from 'twikoo-func-cloudflare-patch/utils/image'
-import logger from 'twikoo-func-cloudflare-patch/utils/logger'
+} from 'twikoo-func/utils/import'
+import { postCheckSpam } from 'twikoo-func/utils/spam'
+import { sendNotice, emailTest } from 'twikoo-func/utils/notify'
+import { uploadImage } from 'twikoo-func/utils/image'
+import logger from 'twikoo-func/utils/logger'
 
 // 常量 / constants
-import constants from 'twikoo-func-cloudflare-patch/utils/constants'
+import constants from 'twikoo-func/utils/constants'
 
 // 注入Cloudflare特定的依赖（原依赖于Cloudflare不兼容）
 setCustomLibs({
@@ -86,7 +86,7 @@ const md5 = getMd5()
 const xml2js = getXml2js()
 
 const { RES_CODE, MAX_REQUEST_TIMES } = constants
-const VERSION = '1.6.34'
+const VERSION = '1.6.35'
 
 // 全局变量 / variables
 let config
