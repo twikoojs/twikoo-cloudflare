@@ -23,7 +23,7 @@ This is the twikoo deployment on Cloudflare workers. Compared to other deploymen
   npx wrangler d1 create twikoo
   ```
 4. Copy 2 lines of `database_name` and `database_id` from the output of the previous step, and paste them into `wrangler.toml` file, replacing the original values.
-5. Set up the Cloudflare D1 schema
+5. Set up the Cloudflare D1 schema:
    ```shell
    npx wrangler d1 execute twikoo --remote --file=./schema.sql
    ```
