@@ -21,18 +21,21 @@ This is the twikoo deployment on Cloudflare workers. Compared to other deploymen
 3. Create the Cloudflare D1 database and set up the schema:
   ```shell
   npx wrangler d1 create twikoo
-  npx wrangler d1 execute twikoo --remote --file=./schema.sql
   ```
-4. Copy 2 lines of "database_name" and "database_id" from the output of the previous step, and paste them into `wrangler.toml` file, overwrite the original values.
-5. Deploy the Cloudflare worker:
+4. Copy 2 lines of "database_name" and "database_id" from the output of the previous step, and paste them into `wrangler.toml` file, replacing the original values.
+5. Set up the Cloudflare D1 schema
+   ```shell
+   npx wrangler d1 execute twikoo --remote --file=./schema.sql
+   ```
+6. Deploy the Cloudflare worker:
   ```shell
   npx wrangler deploy --minify
   ```
-6. If everything works smoothly, you will see something like: `https://twikoo-cloudflare.<your user name>.workers.dev` in the commandline. You can visit the address. If everything is set up perfectly, you're expected to see a line like that in your browser:
+7. If everything works smoothly, you will see something like: `https://twikoo-cloudflare.<your user name>.workers.dev` in the commandline. You can visit the address. If everything is set up perfectly, you're expected to see a line like that in your browser:
   ```
   {"code":100,"message":"Twikoo 云函数运行正常，请参考 https://twikoo.js.org/frontend.html 完成前端的配置","version":"1.6.33"}
   ```
-7. When you set up the front end, the address in step 6 (including the `https://` prefix) should be used as the `envId` field in `twikoo.init`.
+8. When you set up the front end, the address in step 6 (including the `https://` prefix) should be used as the `envId` field in `twikoo.init`.
 
 ## Known limitations
 
