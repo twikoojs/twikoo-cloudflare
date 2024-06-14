@@ -46,6 +46,7 @@ Because Cloudflare workers are only [partially compatible](https://developers.cl
 3. Can't find the location based on ip address (compatibility issue of the `@imaegoo/node-ip2region` package).
 4. Package `dompurify` can't be used to sanitize the comments due to compatibility issue of `jsdom` package. Instead, we're using [`xss`](https://www.npmjs.com/package/xss) package for XSS sanitization.
 5. In this deployment, we don't normalize URL path between `/some/path/` and `/some/path`. This is because it's not easy to write a Cloudflare D1 SQL query to unify these 2 kinds of paths. If your website can have paths with and without the trailing `/` for the same page, you can explicitly set the `path` field in `twikoo.init`.
+6. Image uploading can't work properly. This is because the feature relies on local file system, which is not supported in Cloudflare workers.
 
 ## Configure for email notifications
 
