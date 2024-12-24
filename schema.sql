@@ -1,4 +1,3 @@
-DROP TABLE IF EXISTS comment;
 CREATE TABLE IF NOT EXISTS comment (
   _id TEXT NOT NULL,
   uid TEXT NOT NULL,
@@ -23,17 +22,15 @@ CREATE TABLE IF NOT EXISTS comment (
   PRIMARY KEY (url, created DESC)
 );
 
-CREATE INDEX idx_comment_created ON comment (created DESC);
-CREATE INDEX idx_comment_ip_created ON comment (ip, created DESC);
+CREATE INDEX IF NOT EXISTS idx_comment_created ON comment (created DESC);
+CREATE INDEX IF NOT EXISTS idx_comment_ip_created ON comment (ip, created DESC);
 
-DROP TABLE IF EXISTS config;
 CREATE TABLE IF NOT EXISTS config (
   value TEXT NOT NULL
 );
 
-INSERT INTO config VALUES ("");
+INSERT INTO config (value) SELECT '' WHERE NOT EXISTS (SELECT 1 FROM config);
 
-DROP TABLE IF EXISTS counter;
 CREATE TABLE IF NOT EXISTS counter (
   url TEXT NOT NULL PRIMARY KEY,
   title TEXT NOT NULL,
