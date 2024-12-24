@@ -42,6 +42,8 @@ This is the Cloudflare deployment for [twikoo](https://twikoo.js.org/en/intro.ht
   ```
 10. When you set up the front end, the address in step 6 (including the `https://` prefix) should be used as the `envId` field in `twikoo.init`.
 
+> Auto deploy: [See the blog](https://blog.mingy.org/2024/12/hexo-add-twikoo/)
+
 ## Known limitations
 
 Because Cloudflare workers are only [partially compatible](https://developers.cloudflare.com/workers/runtime-apis/nodejs/) with Node.js, there are certain functional limitations for the twikoo Cloudflare deployment due to compatibility issues:
