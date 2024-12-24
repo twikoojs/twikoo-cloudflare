@@ -25,7 +25,6 @@ import {
   getQQAvatar,
   getPasswordStatus,
   preCheckSpam,
-  checkTurnstileCaptcha,
   getConfig,
   getConfigForAdmin,
   validate
@@ -874,6 +873,24 @@ async function checkCaptcha (comment, request) {
       turnstileToken: comment.turnstileToken,
       turnstileTokenSecretKey: config.TURNSTILE_SECRET_KEY
     })
+  }
+}
+
+async function checkTurnstileCaptcha ({ ip, turnstileToken, turnstileTokenSecretKey }) {
+  try {
+    const formData = new FormData()
+    formData.append('secret', turnstileTokenSecretKey)
+    formData.append('response', turnstileToken)
+    formData.append('remoteip', ip)
+    const resp = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      body: formData,
+    })
+    const data = await resp.json()
+    logger.log('验证码检测结果', data)
+    if (!data.success) throw new Error('验证码错误')
+  } catch (e) {
+    throw new Error('验证码检测失败: ' + e.message)
   }
 }
 
