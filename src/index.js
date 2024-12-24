@@ -9,6 +9,7 @@ import xss from 'xss'
 import {
   getCheerio,
   getMd5,
+  getSha256,
   getXml2js,
   setCustomLibs
 } from 'twikoo-func/utils/lib'
@@ -83,10 +84,11 @@ setCustomLibs({
 
 const $ = getCheerio()
 const md5 = getMd5()
+const sha256 = getSha256()
 const xml2js = getXml2js()
 
 const { RES_CODE, MAX_REQUEST_TIMES } = constants
-const VERSION = '1.6.35'
+const VERSION = '1.6.40'
 
 // 全局变量 / variables
 let config
@@ -817,7 +819,7 @@ async function parse (comment, request) {
     uid: getUid(),
     nick: comment.nick ? comment.nick : '匿名',
     mail: comment.mail ? comment.mail : '',
-    mailMd5: comment.mail ? md5(normalizeMail(comment.mail)) : '',
+    mailMd5: comment.mail ? sha256(normalizeMail(comment.mail)) : '',
     link: comment.link ? comment.link : '',
     ua: comment.ua,
     ip: getIp(request),
