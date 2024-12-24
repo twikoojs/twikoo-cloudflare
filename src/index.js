@@ -1,6 +1,6 @@
 /*!
  * Twikoo Cloudflare worker
- * (c) 2024-present Tao Xin & iMaeGoo
+ * (c) 2024-present Mingy & Tao Xin & iMaeGoo
  * Released under the MIT License.
  */
 
@@ -381,7 +381,11 @@ export default {
           res = await emailTest(event, config, isAdmin())
         break
         case 'UPLOAD_IMAGE': // >= 1.5.0
-          res = await uploadImage(event, config)
+          if (env.R2 && env.R2_PUBLIC_URL) {
+            res = await r2_upload(event, env.R2, env.R2_PUBLIC_URL)
+          } else {
+            res = await uploadImage(event, config)
+          }
           break
         case 'COMMENT_EXPORT_FOR_ADMIN': // >= 1.6.13
           res = await commentExportForAdmin(event)
@@ -1017,4 +1021,57 @@ function isAdmin () {
 
 function getIp (request) {
   return request.headers.get('CF-Connecting-IP')
+}
+
+// R2上传图片
+async function r2_upload(event, bucket, cdnUrl) {
+  const { photo } = event
+  const res = {}
+  try {
+    if (cdnUrl.endsWith('/')) {
+      cdnUrl = cdnUrl.substring(0, cdnUrl.length - 1)
+    }
+    const now = new Date()
+    const year = now.getFullYear()
+    const month = now.getMonth() + 1
+    const path = month < 10 ? `${year}/0${month}/` : `${year}/${month}/`
+    let filename = md5(photo)
+    const blob = dataURIToBlob(photo)
+    const mime = blob.type.split('/')
+    if (mime.length > 1) {
+      filename += '.' + mime[1].trim()
+    }
+    const object = await bucket.put(path + filename, blob)
+    res.code = 0
+    res.data = {
+      name: filename,
+      size: object.size,
+      etag: object.etag,
+      url: `${cdnUrl}/${path}${filename}`
+    }
+  } catch (e) {
+    logger.error(e)
+    res.code = 1040
+    res.err = e.message
+  }
+  return res
+}
+
+function dataURIToBlob(dataURI) {
+  // 分离 MIME 类型和 base64 数据
+  const [header, base64] = dataURI.split(',');
+  const mime = header.match(/:(.*?);/)[1];
+
+  // 解码 base64 数据
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+
+  // 创建 Uint8Array 存储二进制数据
+  const uint8Array = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+      uint8Array[i] = binaryString.charCodeAt(i);
+  }
+
+  // 创建 Blob 对象
+  return new Blob([uint8Array], { type: mime });
 }

@@ -8,10 +8,14 @@ node_compat = true
 [[d1_databases]]
 binding = "DB" # available in your Worker on env.DB
 database_name = "twikoo"
-database_id = "218baf47-5600-4e70-b5bf-79dffbac9680"
+database_id = "b35e0bd5-6d17-42eb-a597-ff4869a74461"
+
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "twikoo"
 
 [vars]
-IS_CLOUDFLARE_WORKER = "true"
+R2_PUBLIC_URL = "https://twikoo.r2.mingy.org"
 
 [dev]
 port = 5000

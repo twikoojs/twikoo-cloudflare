@@ -1,8 +1,8 @@
 {
   "name": "twikoo-cloudflare",
   "version": "1.6.40",
-  "description": "A simple comment system.",
-  "author": "Tao Xin <tao@vanjs.org> (https://github.com/Tao-VanJS)",
+  "description": "A simple, safe, free comment system.",
+  "author": "Mingy <master@mingy.org> (https://github.com/wuzhengmao)",
   "license": "MIT",
   "type": "module",
   "scripts": {
@@ -12,7 +12,7 @@
   },
   "homepage": "https://twikoo.js.org",
   "devDependencies": {
-    "wrangler": "^3.55.0"
+    "wrangler": "^3.99.0"
   },
   "dependencies": {
     "twikoo-func": "^1.6.40",
