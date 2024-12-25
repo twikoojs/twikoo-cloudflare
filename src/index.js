@@ -54,27 +54,49 @@ setCustomLibs({
   },
 
   nodemailer: {
-    createTransport () {
+    createTransport (config) {
       return {
         verify () {
+          if (!config.service || (config.service.toLowerCase() !== 'sendgrid' && config.service.toLowerCase() !== 'mailchannel')) {
+            throw new Error('仅支持 SendGrid 和 MailChannel 邮件服务。')
+          }
+          if (!config.auth || !config.auth.pass) {
+            throw new Error('需要在 SMTP_PASS 中配置 API 令牌。')
+          }
           return true
         },
 
         sendMail ({ from, to, subject, html }) {
-          if (!config.SMTP_PASS) return "未配置SMTP_PASS，跳过邮件通知。"
-          return fetch('https://api.sendgrid.com/v3/mail/send', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${config.SMTP_PASS}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              personalizations: [{ to: [{ email: to }] }],
-              from: { email: from },
-              subject,
-              content: [{ type: 'text/html', value: html }],
+          if (config.service.toLowerCase() === 'sendgrid') {
+            return fetch('https://api.sendgrid.com/v3/mail/send', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${config.auth.pass}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                personalizations: [{ to: [{ email: to }] }],
+                from: { email: from },
+                subject,
+                content: [{ type: 'text/html', value: html }],
+              })
             })
-          })
+          } else if (config.service.toLowerCase() === 'mailchannel') {
+            return fetch('https://api.mailchannels.net/tx/v1/send', {
+              method: 'POST',
+              headers: {
+                'X-Api-Key': config.auth.pass,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                personalizations: [{ to: [{ email: to }] }],
+                from: { email: from },
+                subject,
+                content: [{ type: 'text/html', value: html }],
+              })
+            })
+          }
         }
       }
     }
