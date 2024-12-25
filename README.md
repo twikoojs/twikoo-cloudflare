@@ -59,7 +59,7 @@ Because Cloudflare workers are only [partially compatible](https://developers.cl
 ## Configure for email notifications
 
 Because of the compatibility issues of `nodemailer` package, the email integration via SMTP for sending notifications won't work directly. Instead, in this worker, we support email notifications via SendGrid's HTTPS API. To enable the email integration via SendGrid, you can follow the steps below:
-1. Ensure you have a usable SendGrid account (SendGrid offers a free-tier for sending up to 100 emails per day), and create an API key.
+1. Ensure you have a usable SendGrid account (SendGrid offers a free-tier for sending up to 100 emails per day) or MailChannels account (free for 3000 emails per month), and create an API key.
 2. Set the following fields in the config:
   * `SENDER_EMAIL`: The email address of the sender. Needs to verify it in SendGrid.
   * `SENDER_NAME`: The name shown as the sender.
