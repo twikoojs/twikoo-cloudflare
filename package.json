@@ -2,7 +2,8 @@
   "name": "twikoo-cloudflare",
   "version": "1.6.40",
   "description": "A simple, safe, free comment system.",
-  "author": "Mingy <master@mingy.org> (https://github.com/wuzhengmao)",
+  "author": "Tao Xin <tao@vanjs.org> (https://	
+github.com/Tao-VanJS), Mingy <master@mingy.org> (https://github.com/wuzhengmao)",
   "license": "MIT",
   "type": "module",
   "scripts": {
