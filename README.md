@@ -72,4 +72,4 @@ Because of the compatibility issues of `nodemailer` package, the email integrati
 
 ---
 
-If you encounter any issues, or have any questions for this deployment, you can send an email to master@mingy.org.
+If you encounter any issues, or have any questions for this deployment, you can send an email to tao@vanjs.org.
