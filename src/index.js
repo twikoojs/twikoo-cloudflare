@@ -1,6 +1,6 @@
 /*!
  * Twikoo Cloudflare worker
- * (c) 2024-present Mingy & Tao Xin & iMaeGoo
+ * (c) 2024-present Tao Xin & Mingy & iMaeGoo
  * Released under the MIT License.
  */
 
