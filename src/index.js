@@ -1,6 +1,6 @@
 /*!
  * Twikoo Cloudflare worker
- * (c) 2024-present Tao Xin & iMaeGoo
+ * (c) 2024-present Mingy & Tao Xin & iMaeGoo
  * Released under the MIT License.
  */
 
@@ -9,6 +9,7 @@ import xss from 'xss'
 import {
   getCheerio,
   getMd5,
+  getSha256,
   getXml2js,
   setCustomLibs
 } from 'twikoo-func/utils/lib'
@@ -24,7 +25,6 @@ import {
   getQQAvatar,
   getPasswordStatus,
   preCheckSpam,
-  checkTurnstileCaptcha,
   getConfig,
   getConfigForAdmin,
   validate
@@ -54,27 +54,52 @@ setCustomLibs({
   },
 
   nodemailer: {
-    createTransport () {
+    createTransport (config) {
       return {
         verify () {
+          if (!config.service || (config.service.toLowerCase() !== 'sendgrid' && config.service.toLowerCase() !== 'mailchannels')) {
+            throw new Error('仅支持 SendGrid 和 MailChannels 邮件服务。')
+          }
+          if (!config.auth || !config.auth.user) {
+            throw new Error('需要在 SMTP_USER 中配置账户名，如果邮件服务不需要可随意填写。')
+          }
+          if (!config.auth || !config.auth.pass) {
+            throw new Error('需要在 SMTP_PASS 中配置 API 令牌。')
+          }
           return true
         },
 
         sendMail ({ from, to, subject, html }) {
-          if (!config.SMTP_PASS) return "未配置SMTP_PASS，跳过邮件通知。"
-          return fetch('https://api.sendgrid.com/v3/mail/send', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${config.SMTP_PASS}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              personalizations: [{ to: [{ email: to }] }],
-              from: { email: from },
-              subject,
-              content: [{ type: 'text/html', value: html }],
+          if (config.service.toLowerCase() === 'sendgrid') {
+            return fetch('https://api.sendgrid.com/v3/mail/send', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${config.auth.pass}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                personalizations: [{ to: [{ email: to }] }],
+                from: { email: from },
+                subject,
+                content: [{ type: 'text/html', value: html }],
+              })
             })
-          })
+          } else if (config.service.toLowerCase() === 'mailchannels') {
+            return fetch('https://api.mailchannels.net/tx/v1/send', {
+              method: 'POST',
+              headers: {
+                'X-Api-Key': config.auth.pass,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                personalizations: [{ to: [{ email: to }] }],
+                from: { email: from },
+                subject,
+                content: [{ type: 'text/html', value: html }],
+              })
+            })
+          }
         }
       }
     }
@@ -83,10 +108,11 @@ setCustomLibs({
 
 const $ = getCheerio()
 const md5 = getMd5()
+const sha256 = getSha256()
 const xml2js = getXml2js()
 
 const { RES_CODE, MAX_REQUEST_TIMES } = constants
-const VERSION = '1.6.35'
+const VERSION = '1.6.40'
 
 // 全局变量 / variables
 let config
@@ -379,7 +405,11 @@ export default {
           res = await emailTest(event, config, isAdmin())
         break
         case 'UPLOAD_IMAGE': // >= 1.5.0
-          res = await uploadImage(event, config)
+          if (env.R2 && env.R2_PUBLIC_URL) {
+            res = await r2_upload(event, env.R2, env.R2_PUBLIC_URL)
+          } else {
+            res = await uploadImage(event, config)
+          }
           break
         case 'COMMENT_EXPORT_FOR_ADMIN': // >= 1.6.13
           res = await commentExportForAdmin(event)
@@ -812,12 +842,13 @@ async function parse (comment, request) {
   const isAdminUser = isAdmin()
   const isBloggerMail = equalsMail(comment.mail, config.BLOGGER_EMAIL)
   if (isBloggerMail && !isAdminUser) throw new Error('请先登录管理面板，再使用博主身份发送评论')
+  const hashMethod = config.GRAVATAR_CDN === 'cravatar.cn' ? md5 : sha256
   const commentDo = {
     _id: uuidv4().replace(/-/g, ''),
     uid: getUid(),
     nick: comment.nick ? comment.nick : '匿名',
     mail: comment.mail ? comment.mail : '',
-    mailMd5: comment.mail ? md5(normalizeMail(comment.mail)) : '',
+    mailMd5: comment.mail ? hashMethod(normalizeMail(comment.mail)) : '',
     link: comment.link ? comment.link : '',
     ua: comment.ua,
     ip: getIp(request),
@@ -867,6 +898,24 @@ async function checkCaptcha (comment, request) {
       turnstileToken: comment.turnstileToken,
       turnstileTokenSecretKey: config.TURNSTILE_SECRET_KEY
     })
+  }
+}
+
+async function checkTurnstileCaptcha ({ ip, turnstileToken, turnstileTokenSecretKey }) {
+  try {
+    const formData = new FormData()
+    formData.append('secret', turnstileTokenSecretKey)
+    formData.append('response', turnstileToken)
+    formData.append('remoteip', ip)
+    const resp = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      body: formData,
+    })
+    const data = await resp.json()
+    logger.log('验证码检测结果', data)
+    if (!data.success) throw new Error('验证码错误')
+  } catch (e) {
+    throw new Error('验证码检测失败: ' + e.message)
   }
 }
 
@@ -1014,4 +1063,57 @@ function isAdmin () {
 
 function getIp (request) {
   return request.headers.get('CF-Connecting-IP')
+}
+
+// R2上传图片
+async function r2_upload(event, bucket, cdnUrl) {
+  const { photo } = event
+  const res = {}
+  try {
+    if (cdnUrl.endsWith('/')) {
+      cdnUrl = cdnUrl.substring(0, cdnUrl.length - 1)
+    }
+    const now = new Date()
+    const year = now.getFullYear()
+    const month = now.getMonth() + 1
+    const path = month < 10 ? `${year}/0${month}/` : `${year}/${month}/`
+    let filename = md5(photo)
+    const blob = dataURIToBlob(photo)
+    const mime = blob.type.split('/')
+    if (mime.length > 1) {
+      filename += '.' + mime[1].trim()
+    }
+    const object = await bucket.put(path + filename, blob)
+    res.code = 0
+    res.data = {
+      name: filename,
+      size: object.size,
+      etag: object.etag,
+      url: `${cdnUrl}/${path}${filename}`
+    }
+  } catch (e) {
+    logger.error(e)
+    res.code = 1040
+    res.err = e.message
+  }
+  return res
+}
+
+function dataURIToBlob(dataURI) {
+  // 分离 MIME 类型和 base64 数据
+  const [header, base64] = dataURI.split(',');
+  const mime = header.match(/:(.*?);/)[1];
+
+  // 解码 base64 数据
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+
+  // 创建 Uint8Array 存储二进制数据
+  const uint8Array = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+      uint8Array[i] = binaryString.charCodeAt(i);
+  }
+
+  // 创建 Blob 对象
+  return new Blob([uint8Array], { type: mime });
 }

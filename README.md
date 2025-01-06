@@ -27,15 +27,22 @@ This is the Cloudflare deployment for [twikoo](https://twikoo.js.org/en/intro.ht
    ```shell
    npx wrangler d1 execute twikoo --remote --file=./schema.sql
    ```
-6. Deploy the Cloudflare worker:
+6. Create the Cloudflare R2 Storage:
+   ```shell
+   npx wrangler r2 bucket create twikoo
+   ```
+7. Update the domain of R2 into `wrangler.toml` file, replacing the `R2_PUBLIC_URL` value.
+8. Deploy the Cloudflare worker:
   ```shell
   npx wrangler deploy --minify
   ```
-7. If everything works smoothly, you will see something like: `https://twikoo-cloudflare.<your user name>.workers.dev` in the commandline. You can visit the address. If everything is set up perfectly, you're expected to see a line like that in your browser:
+9. If everything works smoothly, you will see something like: `https://twikoo-cloudflare.<your user name>.workers.dev` in the commandline. You can visit the address. If everything is set up perfectly, you're expected to see a line like that in your browser:
   ```
   {"code":100,"message":"Twikoo 云函数运行正常，请参考 https://twikoo.js.org/frontend.html 完成前端的配置","version":"1.6.33"}
   ```
-8. When you set up the front end, the address in step 6 (including the `https://` prefix) should be used as the `envId` field in `twikoo.init`.
+10. When you set up the front end, the address in step 6 (including the `https://` prefix) should be used as the `envId` field in `twikoo.init`.
+
+> Auto deploy: [See the blog](https://blog.mingy.org/2024/12/hexo-add-twikoo/)
 
 ## Known limitations
 
@@ -46,13 +53,13 @@ Because Cloudflare workers are only [partially compatible](https://developers.cl
 3. Can't find the location based on ip address (compatibility issue of the `@imaegoo/node-ip2region` package).
 4. Package `dompurify` can't be used to sanitize the comments due to compatibility issue of `jsdom` package. Instead, we're using [`xss`](https://www.npmjs.com/package/xss) package for XSS sanitization.
 5. In this deployment, we don't normalize URL path between `/some/path/` and `/some/path`. This is because it's not easy to write a Cloudflare D1 SQL query to unify these 2 kinds of paths. If your website can have paths with and without the trailing `/` for the same page, you can explicitly set the `path` field in `twikoo.init`.
-6. Image uploading can't work properly. This is because the feature relies on local file system, which is not supported in Cloudflare workers.
-7. Integration with `pushoo.js` doesn't work as `pushoo.js` depends on `axio` which needs NodeJS runtime.
+6. Image uploading instead of using Cloudflare R2 Storage.
+7. Since using [axios-cf-worker](https://github.com/wuzhengmao/axios-cf-worker), `pushoo.js` works well.
 
 ## Configure for email notifications
 
 Because of the compatibility issues of `nodemailer` package, the email integration via SMTP for sending notifications won't work directly. Instead, in this worker, we support email notifications via SendGrid's HTTPS API. To enable the email integration via SendGrid, you can follow the steps below:
-1. Ensure you have a usable SendGrid account (SendGrid offers a free-tier for sending up to 100 emails per day), and create an API key.
+1. Ensure you have a usable SendGrid account (SendGrid offers a free-tier for sending up to 100 emails per day) or MailChannels account (free for 3000 emails per month), and create an API key.
 2. Set the following fields in the config:
   * `SENDER_EMAIL`: The email address of the sender. Needs to verify it in SendGrid.
   * `SENDER_NAME`: The name shown as the sender.

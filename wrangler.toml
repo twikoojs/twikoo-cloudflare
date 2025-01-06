@@ -1,17 +1,20 @@
 #:schema node_modules/wrangler/config-schema.json
 name = "twikoo-cloudflare"
 main = "src/index.js"
-compatibility_date = "2024-05-02"
-# compatibility_flags = ["nodejs_compat"]
-node_compat = true
+compatibility_flags = ["nodejs_compat"]
+compatibility_date = "2024-09-23"
 
 [[d1_databases]]
 binding = "DB" # available in your Worker on env.DB
 database_name = "twikoo"
-database_id = "218baf47-5600-4e70-b5bf-79dffbac9680"
+database_id = "b35e0bd5-6d17-42eb-a597-ff4869a74461"
+
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "twikoo"
 
 [vars]
-IS_CLOUDFLARE_WORKER = "true"
+R2_PUBLIC_URL = "https://twikoo.r2.mingy.org"
 
 [dev]
 port = 5000
