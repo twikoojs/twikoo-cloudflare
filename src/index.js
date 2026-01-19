@@ -57,8 +57,8 @@ setCustomLibs({
     createTransport (config) {
       return {
         verify () {
-          if (!config.service || (config.service.toLowerCase() !== 'sendgrid' && config.service.toLowerCase() !== 'mailchannels')) {
-            throw new Error('仅支持 SendGrid 和 MailChannels 邮件服务。')
+          if (!config.service || (config.service.toLowerCase() !== 'sendgrid' && config.service.toLowerCase() !== 'mailchannels' && config.service.toLowerCase() !== 'resend')) {
+            throw new Error('仅支持 SendGrid 、 MailChannels 、 resend 邮件服务。')
           }
           if (!config.auth || !config.auth.user) {
             throw new Error('需要在 SMTP_USER 中配置账户名，如果邮件服务不需要可随意填写。')
@@ -97,6 +97,21 @@ setCustomLibs({
                 from: { email: from },
                 subject,
                 content: [{ type: 'text/html', value: html }],
+              })
+            })
+          } else if (config.service.toLowerCase() === 'resend') {
+            return fetch('https://api.resend.com/emails', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${config.auth.pass}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+              },
+              body: JSON.stringify({
+                from: from,
+                to: to,
+                subject: subject,
+                html: html,
               })
             })
           }
