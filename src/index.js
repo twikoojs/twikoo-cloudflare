@@ -452,7 +452,6 @@ export default {
           res = await emailTest(event, config, isAdmin())
         break
         case 'UPLOAD_IMAGE': // >= 1.5.0
-          logger.log('R2 binding:', !!env.R2, 'R2_PUBLIC_URL:', env.R2_PUBLIC_URL)
           if (env.R2 && env.R2_PUBLIC_URL) {
             res = await r2_upload(event, env.R2, env.R2_PUBLIC_URL)
           } else {
