@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS comment (
   link TEXT NOT NULL,
   ua TEXT NOT NULL,
   ip TEXT NOT NULL,
+  ipRegion TEXT NOT NULL DEFAULT '',
   master INTEGER NOT NULL,
   url TEXT NOT NULL,
   href TEXT NOT NULL,
@@ -21,6 +22,9 @@ CREATE TABLE IF NOT EXISTS comment (
   avatar TEXT NOT NULL,
   PRIMARY KEY (url, created DESC)
 );
+
+-- Migration: Add ipRegion column if not exists (for existing databases)
+-- Run this manually: ALTER TABLE comment ADD COLUMN ipRegion TEXT NOT NULL DEFAULT '';
 
 CREATE INDEX IF NOT EXISTS idx_comment_created ON comment (created DESC);
 CREATE INDEX IF NOT EXISTS idx_comment_ip_created ON comment (ip, created DESC);
