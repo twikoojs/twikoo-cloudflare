@@ -7,11 +7,8 @@
 import { v4 as uuidv4 } from 'uuid' // 用户 id 生成
 import xss from 'xss'
 
-// Cloudflare request.cf 地理信息 (每次请求更新)
+// Cloudflare request.cf 地理信息 (每次请求更新，用于新评论提交)
 let currentRequestGeo = { ip: null, region: '' }
-
-// IP 地区缓存 (用于显示历史评论)
-const ipRegionCache = new Map()
 import {
   getCheerio,
   getMd5,
@@ -61,24 +58,6 @@ setCustomLibs({
   },
 
   // 使用 Cloudflare request.cf 替代 ip2region
-  ipToRegion: {
-    create() {
-      return {
-        binarySearchSync(ip) {
-          // 优先使用缓存的地区信息 (从数据库读取的历史评论)
-          if (ipRegionCache.has(ip)) {
-            return { region: ipRegionCache.get(ip) }
-          }
-          // 当前请求的 IP，使用 Cloudflare 提供的地理信息
-          if (ip === currentRequestGeo.ip) {
-            return { region: currentRequestGeo.region }
-          }
-          return { region: '' }
-        }
-      }
-    }
-  },
-
   nodemailer: {
     createTransport (config) {
       return {
@@ -372,10 +351,11 @@ export default {
   async fetch (request, env) {
     setDb(env.DB)
     // 从 Cloudflare 获取 IP 地理信息 (替代 ip2region)
+    // 格式: country|0|province|city|isp (与 ip2region 格式一致)
     const cf = request.cf || {}
     currentRequestGeo = {
       ip: request.headers.get('CF-Connecting-IP'),
-      region: [cf.country, cf.region, cf.city].filter(Boolean).join(' ') || ''
+      region: `${cf.country || ''}|0|${cf.region || ''}|${cf.city || ''}|`
     }
     let event
     try {
@@ -615,14 +595,28 @@ async function commentGet (event) {
       .bind(
         event.url, isAdminUser ? 2 : 1, uid, ...main.map((item) => item._id)
       ).all()
-    // 填充 IP 地区缓存 (用于 ipToRegion 查询)
+    // 合并所有评论
     const allComments = [...main, ...reply]
-    for (const c of allComments) {
-      if (c.ip && c.ipRegion) {
-        ipRegionCache.set(c.ip, c.ipRegion)
+    // parseComment 调用 getIpRegion，但 twikoo-func 的 getIpToRegion 不支持自定义 lib
+    // 所以需要在解析后手动设置 ipRegion
+    const parsedComments = parseComment(allComments.map(parseLike), uid, config)
+    const showRegion = !!config.SHOW_REGION && config.SHOW_REGION !== 'false'
+    if (showRegion) {
+      for (const pc of parsedComments) {
+        const original = allComments.find(c => c._id === pc.id)
+        if (original && original.ipRegion) {
+          pc.ipRegion = formatIpRegion(original.ipRegion)
+        }
+        // 处理回复
+        for (const reply of pc.replies || []) {
+          const originalReply = allComments.find(c => c._id === reply.id)
+          if (originalReply && originalReply.ipRegion) {
+            reply.ipRegion = formatIpRegion(originalReply.ipRegion)
+          }
+        }
       }
     }
-    res.data = parseComment(allComments.map(parseLike), uid, config)
+    res.data = parsedComments
     res.more = more
     res.count = count
   } catch (e) {
@@ -1153,6 +1147,22 @@ function isAdmin () {
 
 function getIp (request) {
   return request.headers.get('CF-Connecting-IP')
+}
+
+// 格式化 IP 地区显示 (从 ip2region 格式转为显示格式)
+// 输入: country|0|province|city|isp
+// 输出: 国家 省/州 (例如: "US Washington" 或 "中国 广东")
+function formatIpRegion (region) {
+  if (!region) return ''
+  const [country, , province] = region.split('|')
+  const parts = []
+  if (country && country.trim() && country !== '0') {
+    parts.push(country.trim())
+  }
+  if (province && province.trim() && province !== '0') {
+    parts.push(province.trim().replace(/(省|市)$/, ''))
+  }
+  return parts.join(' ')
 }
 
 // R2上传图片
