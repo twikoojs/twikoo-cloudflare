@@ -12,10 +12,10 @@
   },
   "homepage": "https://twikoo.js.org",
   "devDependencies": {
-    "wrangler": "^3.99.0"
+    "wrangler": "^4.68.0"
   },
   "dependencies": {
-    "twikoo-func": "^1.6.40",
+    "twikoo-func": "^1.6.44",
     "url": "^0.11.3",
     "uuid": "^9.0.1",
     "xss": "^1.0.15"

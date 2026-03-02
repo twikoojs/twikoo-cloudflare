@@ -6,6 +6,9 @@
 
 import { v4 as uuidv4 } from 'uuid' // 用户 id 生成
 import xss from 'xss'
+
+// Cloudflare request.cf 地理信息 (每次请求更新，用于新评论提交)
+let currentRequestGeo = { ip: null, region: '' }
 import {
   getCheerio,
   getMd5,
@@ -41,6 +44,7 @@ import { postCheckSpam } from 'twikoo-func/utils/spam'
 import { sendNotice, emailTest } from 'twikoo-func/utils/notify'
 import { uploadImage } from 'twikoo-func/utils/image'
 import logger from 'twikoo-func/utils/logger'
+import twikooFuncPkg from 'twikoo-func/package.json'
 
 // 常量 / constants
 import constants from 'twikoo-func/utils/constants'
@@ -53,6 +57,7 @@ setCustomLibs({
     }
   },
 
+  // 使用 Cloudflare request.cf 替代 ip2region
   nodemailer: {
     createTransport (config) {
       return {
@@ -127,7 +132,7 @@ const sha256 = getSha256()
 const xml2js = getXml2js()
 
 const { RES_CODE, MAX_REQUEST_TIMES } = constants
-const VERSION = '1.6.40'
+const VERSION = twikooFuncPkg.version
 
 // 全局变量 / variables
 let config
@@ -257,7 +262,7 @@ WHERE _id = ?
       this.DB.prepare(`
 INSERT INTO comment VALUES (
   ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10,
-  ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20
+  ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21
 )
 `.trim()))
   }
@@ -345,6 +350,13 @@ export default {
    */
   async fetch (request, env) {
     setDb(env.DB)
+    // 从 Cloudflare 获取 IP 地理信息 (替代 ip2region)
+    // 格式: country|0|province|city|isp (与 ip2region 格式一致)
+    const cf = request.cf || {}
+    currentRequestGeo = {
+      ip: request.headers.get('CF-Connecting-IP'),
+      region: `${cf.country || ''}|0|${cf.region || ''}|${cf.city || ''}|`
+    }
     let event
     try {
       event = await request.json()
@@ -378,7 +390,7 @@ export default {
           res = await commentSetForAdmin(event)
           break
         case 'COMMENT_DELETE_FOR_ADMIN':
-          res = await commentDeleteForAdmin(event)
+          res = await commentDeleteForAdmin(event, env)
           break
         case 'COMMENT_IMPORT_FOR_ADMIN':
           res = await commentImportForAdmin(event)
@@ -583,7 +595,28 @@ async function commentGet (event) {
       .bind(
         event.url, isAdminUser ? 2 : 1, uid, ...main.map((item) => item._id)
       ).all()
-    res.data = parseComment([...main, ...reply].map(parseLike), uid, config)
+    // 合并所有评论
+    const allComments = [...main, ...reply]
+    // parseComment 调用 getIpRegion，但 twikoo-func 的 getIpToRegion 不支持自定义 lib
+    // 所以需要在解析后手动设置 ipRegion
+    const parsedComments = parseComment(allComments.map(parseLike), uid, config)
+    const showRegion = !!config.SHOW_REGION && config.SHOW_REGION !== 'false'
+    if (showRegion) {
+      for (const pc of parsedComments) {
+        const original = allComments.find(c => c._id === pc.id)
+        if (original && original.ipRegion) {
+          pc.ipRegion = formatIpRegion(original.ipRegion)
+        }
+        // 处理回复
+        for (const reply of pc.replies || []) {
+          const originalReply = allComments.find(c => c._id === reply.id)
+          if (originalReply && originalReply.ipRegion) {
+            reply.ipRegion = formatIpRegion(originalReply.ipRegion)
+          }
+        }
+      }
+    }
+    res.data = parsedComments
     res.more = more
     res.count = count
   } catch (e) {
@@ -643,11 +676,22 @@ async function commentSetForAdmin (event) {
 }
 
 // 管理员删除评论
-async function commentDeleteForAdmin (event) {
+async function commentDeleteForAdmin (event, env) {
   const res = {}
   const isAdminUser = isAdmin()
   if (isAdminUser) {
     validate(event, ['id'])
+    // 删除前先读取评论，清理 R2 图片
+    if (env.R2 && env.R2_PUBLIC_URL) {
+      try {
+        const comment = await db.commentByIdQuery.bind(event.id).first()
+        if (comment && comment.comment) {
+          await cleanupR2Images(comment.comment, env.R2, env.R2_PUBLIC_URL)
+        }
+      } catch (e) {
+        logger.warn('清理 R2 图片失败：', e.message)
+      }
+    }
     await db.commentDeleteStmt.bind(event.id).run()
     res.code = RES_CODE.SUCCESS
   } else {
@@ -655,6 +699,30 @@ async function commentDeleteForAdmin (event) {
     res.message = '请先登录'
   }
   return res
+}
+
+// 清理评论中的 R2 图片
+async function cleanupR2Images (commentHtml, r2Bucket, r2PublicUrl) {
+  // 移除末尾斜杠
+  const baseUrl = r2PublicUrl.replace(/\/$/, '')
+  // 匹配所有图片 URL
+  const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi
+  const deletePromises = []
+  let match
+  while ((match = imgRegex.exec(commentHtml)) !== null) {
+    const imgUrl = match[1]
+    // 检查是否是 R2 图片
+    if (imgUrl.startsWith(baseUrl)) {
+      // 提取 R2 对象 key (去掉 baseUrl 前缀和开头的斜杠)
+      const objectKey = imgUrl.substring(baseUrl.length).replace(/^\//, '')
+      logger.log('删除 R2 图片：', objectKey)
+      deletePromises.push(r2Bucket.delete(objectKey))
+    }
+  }
+  if (deletePromises.length > 0) {
+    await Promise.all(deletePromises)
+    logger.log(`已删除 ${deletePromises.length} 张 R2 图片`)
+  }
 }
 
 // 管理员导入评论
@@ -829,8 +897,8 @@ async function save (data) {
   data.id = data._id = uuidv4().replace(/-/g, '')
   await db.saveCommentStmt.bind(
     data._id, data.uid ?? '', data.nick ?? '', data.mail ?? '', data.mailMd5 ?? '',
-    data.link ?? '', data.ua ?? '', data.ip ?? '', data.master ?? 0,
-    data.url, data.href, data.comment, data.pid ?? '', data.rid ?? '',
+    data.link ?? '', data.ua ?? '', data.ip ?? '', data.ipRegion ?? '',
+    data.master ?? 0, data.url, data.href, data.comment, data.pid ?? '', data.rid ?? '',
     data.isSpam ?? 0, data.created, data.updated,
     JSON.stringify(data.like ?? []), data.top ?? 0, data.avatar ?? ''
   ).run()
@@ -867,6 +935,7 @@ async function parse (comment, request) {
     link: comment.link ? comment.link : '',
     ua: comment.ua,
     ip: getIp(request),
+    ipRegion: currentRequestGeo.region,
     master: isBloggerMail,
     url: comment.url,
     href: comment.href,
@@ -1078,6 +1147,22 @@ function isAdmin () {
 
 function getIp (request) {
   return request.headers.get('CF-Connecting-IP')
+}
+
+// 格式化 IP 地区显示 (从 ip2region 格式转为显示格式)
+// 输入: country|0|province|city|isp
+// 输出: 国家 省/州 (例如: "US Washington" 或 "中国 广东")
+function formatIpRegion (region) {
+  if (!region) return ''
+  const [country, , province] = region.split('|')
+  const parts = []
+  if (country && country.trim() && country !== '0') {
+    parts.push(country.trim())
+  }
+  if (province && province.trim() && province !== '0') {
+    parts.push(province.trim().replace(/(省|市)$/, ''))
+  }
+  return parts.join(' ')
 }
 
 // R2上传图片
