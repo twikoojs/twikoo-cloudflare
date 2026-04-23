@@ -314,7 +314,7 @@ SELECT * FROM comment
 WHERE
   (?1 OR url = ?2) AND
   NOT isSpam AND
-  (?3 OR rid = "") AND
+  (?3 OR rid = "")
 LIMIT ?4
 `.trim()))
   }
@@ -1055,32 +1055,37 @@ async function getCommentsCount (event) {
 async function getRecentComments (event) {
   const res = {}
   try {
-    if (event.pageSize > 100) event.pageSize = 100
-    let result
-    if (event.urls && event.urls.length) {
-      result = await db.recentCommentsByUrlQuery.bind(
-        1, '', event.includeReply, event.pageSize || 10
-      ).all()
-    } else {
-      result = (await Promise.all(event.urls.map(
-        (url) => db.recentCommentsByUrlQuery.bind(
-          0, url, event.includeReply, event.pageSize || 10
-        ).all()
-      ))).flat()
-    }
-    res.data = result.map((comment) => {
-      return {
-        id: comment._id.toString(),
-        url: comment.url,
-        nick: comment.nick,
-        avatar: getAvatar(comment, config),
-        mailMd5: getMailMd5(comment),
-        link: comment.link,
-        comment: comment.comment,
-        commentText: $(comment.comment).text(),
-        created: comment.created
+    const queryComments = (urls) => {
+      const pageSize = event.pageSize > 100 ? 100 : (event.pageSize || 10)
+      const { includeReply } = event
+
+      if (urls?.length) {
+        return Promise.all(urls.map(
+          (url) => db.recentCommentsByUrlQuery.bind(0, url, includeReply, pageSize).all()
+        )).then(results => results.flat())
       }
+
+      return db.recentCommentsByUrlQuery.bind(1, '', includeReply, pageSize).all()
+    }
+
+    const formatComment = (comment) => ({
+      id: comment._id.toString(),
+      url: comment.url,
+      nick: comment.nick,
+      avatar: getAvatar(comment, config),
+      mailMd5: getMailMd5(comment),
+      link: comment.link,
+      comment: comment.comment,
+      commentText: $(comment.comment).text(),
+      created: comment.created
     })
+
+    const result = await queryComments(event?.urls)
+
+    res.data = (Array.isArray(result)
+      ? result.map(item => item.results?.map(comment => formatComment(comment))).flat()
+      : result.results?.map(comment => formatComment(comment)) || []
+    ).filter(Boolean);
   } catch (e) {
     res.message = e.message
     return res
